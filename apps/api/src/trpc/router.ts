@@ -3,6 +3,7 @@ import {
   metaBreedsInputSchema,
   metaBreedsOutputSchema,
 } from "@adopta/contracts";
+import { adoptionRequestsRouter } from "../modules/adoption-requests/index.js";
 import { petsRouter } from "../modules/pets/index.js";
 import { usersRouter } from "../modules/users/index.js";
 import { BREEDS_BY_SPECIES } from "../seed/data/breeds.js";
@@ -33,6 +34,7 @@ export const appRouter = router({
   meta: metaRouter,
   users: usersRouter,
   pets: petsRouter,
+  adoptionRequests: adoptionRequestsRouter,
   auth: authRouter,
 });
 

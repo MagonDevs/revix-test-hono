@@ -1,27 +1,41 @@
-import type { Logger } from "../../lib/logger.js";
+import { DomainThrow, toAppError } from "../../errors/domain-throw.js";
+import { toHttpErrorBody } from "../lib/http-error.js";
+import type { AppVariables } from "../context.js";
 import type { ErrorHandler } from "hono";
 
 /**
- * Hono's `onError` handler — for errors thrown outside tRPC (tRPC's own
- * errors are formatted by `trpc/init.ts`'s `errorFormatter` and never
- * reach this). Converts anything unhandled into the same `internal_error`
- * shape, without leaking a stack, cause, or internal detail. The detail
- * is logged server-side against the request id.
+ * Hono's `onError` — the single exit for every failure in the app.
+ *
+ * A `DomainThrow` carries a declared `AppError` (raised by a guard, by a
+ * parse helper, or by `unwrap` on a service `Err`) and renders as its own
+ * status and code. Anything else is unexpected: it becomes a bare 500
+ * `internal_error`, and the detail — stack, cause, and the scrubbed
+ * request body — is logged server-side against the same request id the
+ * client is handed back, never serialised into the response
+ * (architecture §4).
  */
-export const httpErrorHandler: ErrorHandler<{
-  Variables: { requestId: string; logger: Logger };
-}> = (err, c) => {
+export const httpErrorHandler: ErrorHandler<{ Variables: AppVariables }> = (err, c) => {
   const requestId = c.var.requestId ?? "unknown";
-  const logger = c.var.logger;
-  logger?.error({ err, requestId }, "http.unhandled_error");
+  const appError = err instanceof DomainThrow ? err.appError : toAppError(err);
 
-  return c.json(
-    {
-      error: {
-        message: "Internal error",
-        data: { appCode: "internal_error", requestId },
+  if (appError.code === "internal_error") {
+    c.var.logger?.error(
+      {
+        err,
+        requestId,
+        method: c.req.method,
+        path: c.req.path,
+        userId: c.var.ctx?.user?.id ?? null,
+        input: c.var.scrubbedBody,
       },
-    },
-    500,
-  );
+      "http.unhandled_error",
+    );
+  }
+
+  if (appError.code === "rate_limited") {
+    c.header("Retry-After", String(appError.retryAfterSeconds));
+  }
+
+  const { status, body } = toHttpErrorBody(appError, requestId);
+  return c.json(body, status);
 };

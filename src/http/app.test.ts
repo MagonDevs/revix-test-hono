@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { app } from "./app.js";
+import { API_PREFIX, app } from "./app.js";
+import type { ApiErrorBody } from "#contracts";
 
-// Contract §2, §7.6 — health endpoints and the no-store header, exercised
-// via `app.request()` (no real socket, no real DB required for these
-// specific assertions).
+// Contract §2, §5, §7.6 — the cross-cutting HTTP behaviour every endpoint
+// inherits, exercised via `app.request()`. Deliberately limited to the
+// paths that answer before touching the database (routing, parsing, the
+// auth boundary), so this file needs no Docker; anything that reads a row
+// is covered by the `*.integration.test.ts` suites.
 
 describe("GET /health", () => {
   it("returns 200 (liveness)", async () => {
@@ -19,25 +22,74 @@ describe("GET /ready", () => {
   });
 });
 
-describe("/trpc/* responses", () => {
+describe(`${API_PREFIX}/* responses`, () => {
   it("carry Cache-Control: private, no-store", async () => {
-    const input = encodeURIComponent(JSON.stringify({ json: { species: "dog" } }));
-    const res = await app.request(`/trpc/meta.breeds?input=${input}`);
+    const res = await app.request(`${API_PREFIX}/meta/breeds?species=dog`);
+    expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toBe("private, no-store");
   });
 });
 
-describe("/api/uploads (B6)", () => {
-  it("GET /api/uploads/:uploadId/raw returns 404 for a malformed id, never a 500", async () => {
-    const res = await app.request("/api/uploads/not-a-uuid/raw");
+describe("error envelope", () => {
+  it("reports a missing query param as a validation_error with the offending field", async () => {
+    const res = await app.request(`${API_PREFIX}/meta/breeds`);
+    expect(res.status).toBe(400);
+
+    const body = (await res.json()) as ApiErrorBody;
+    expect(body.error.code).toBe("validation_error");
+    expect(body.error.requestId).toBeTruthy();
+    expect(body.error.details?.map((d) => d.field)).toContain("species");
+  });
+
+  it("rejects a malformed path id with 400, not 404 — the shape is wrong, not the row missing", async () => {
+    const res = await app.request(`${API_PREFIX}/pets/not-a-uuid`);
+    expect(res.status).toBe(400);
+
+    const body = (await res.json()) as ApiErrorBody;
+    expect(body.error.code).toBe("validation_error");
+  });
+
+  it("echoes a caller-supplied x-request-id so a client can correlate its own logs", async () => {
+    const res = await app.request(`${API_PREFIX}/meta/breeds`, {
+      headers: { "x-request-id": "req-from-client" },
+    });
+    const body = (await res.json()) as ApiErrorBody;
+    expect(body.error.requestId).toBe("req-from-client");
+    expect(res.headers.get("x-request-id")).toBe("req-from-client");
+  });
+});
+
+describe("uploads (B6)", () => {
+  it("GET /uploads/:uploadId/raw returns 404 for a malformed id, never a 500", async () => {
+    const res = await app.request(`${API_PREFIX}/uploads/not-a-uuid/raw`);
     expect(res.status).toBe(404);
   });
 
-  it("POST /api/uploads without a session returns the standard unauthenticated shape", async () => {
-    const res = await app.request("/api/uploads", { method: "POST", body: new FormData() });
+  it("POST /uploads without a session is 401 in the standard envelope", async () => {
+    const res = await app.request(`${API_PREFIX}/uploads`, {
+      method: "POST",
+      body: new FormData(),
+    });
     expect(res.status).toBe(401);
-    const body = (await res.json()) as { error: { data: { appCode: string; requestId: string } } };
-    expect(body.error.data.appCode).toBe("unauthenticated");
-    expect(body.error.data.requestId).toBeTruthy();
+
+    const body = (await res.json()) as ApiErrorBody;
+    expect(body.error.code).toBe("unauthenticated");
+    expect(body.error.requestId).toBeTruthy();
+  });
+});
+
+describe("the authenticated surface", () => {
+  it.each([
+    ["GET", "/me/pets"],
+    ["GET", "/me/favourites"],
+    ["GET", "/me/adoption-requests?role=adopter"],
+    ["GET", "/auth/session"],
+    ["POST", "/pets"],
+  ])("%s %s answers 401 when anonymous", async (method, path) => {
+    const res = await app.request(`${API_PREFIX}${path}`, { method });
+    expect(res.status).toBe(401);
+
+    const body = (await res.json()) as ApiErrorBody;
+    expect(body.error.code).toBe("unauthenticated");
   });
 });

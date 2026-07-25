@@ -1,3 +1,5 @@
+import { AppErrors } from "../../errors/app-error.js";
+import { DomainThrow } from "../../errors/domain-throw.js";
 import type { MiddlewareHandler } from "hono";
 
 export interface RateLimitOptions {
@@ -7,7 +9,7 @@ export interface RateLimitOptions {
   by: "ip";
 }
 
-function parseWindowMs(window: string): number {
+export function parseWindowMs(window: string): number {
   const match = /^(\d+)([smh])$/.exec(window);
   if (!match) throw new Error(`Invalid rate-limit window: ${window}`);
   const [, amount, unit] = match as unknown as [string, string, "s" | "m" | "h"];
@@ -16,11 +18,13 @@ function parseWindowMs(window: string): number {
 }
 
 /**
- * B2 stub: an in-memory, single-process fixed-window limiter. Enough to
- * wire the middleware slot into `app.ts` at the right point (before the
- * handler it protects) so B9's real implementation (likely backed by a
- * shared store, for multi-instance correctness) drops in without moving
- * call sites. Not safe across multiple replicas.
+ * An in-memory, single-process fixed-window limiter keyed by client IP —
+ * for the routes where the caller has no identity yet (auth). Identified
+ * callers are limited by `userRateLimit` instead.
+ *
+ * Not safe across replicas: each process keeps its own counters, so the
+ * effective limit multiplies by the replica count. A shared store is the
+ * real fix and is out of scope here.
  */
 export function rateLimit(options: RateLimitOptions): MiddlewareHandler {
   const windowMs = parseWindowMs(options.window);
@@ -33,29 +37,14 @@ export function rateLimit(options: RateLimitOptions): MiddlewareHandler {
 
     if (!entry || entry.resetAt <= now) {
       hits.set(key, { count: 1, resetAt: now + windowMs });
-      await next();
-      return;
+      return next();
     }
 
     entry.count += 1;
     if (entry.count > options.max) {
-      const retryAfterSeconds = Math.ceil((entry.resetAt - now) / 1000);
-      c.header("Retry-After", String(retryAfterSeconds));
-      return c.json(
-        {
-          error: {
-            message: "Too many requests",
-            data: {
-              appCode: "rate_limited",
-              retryAfterSeconds,
-              requestId: c.get("requestId") as string,
-            },
-          },
-        },
-        429,
-      );
+      throw new DomainThrow(AppErrors.rateLimited(Math.ceil((entry.resetAt - now) / 1000)));
     }
 
-    await next();
+    return next();
   };
 }

@@ -7,6 +7,7 @@ export default [
       "eslint.config.js",
       "vitest.config.ts",
       "vitest.integration.config.ts",
+      "vitest.setup.ts",
       "drizzle.config.ts",
     ],
   },

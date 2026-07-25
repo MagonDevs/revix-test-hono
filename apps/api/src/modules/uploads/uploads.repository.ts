@@ -60,6 +60,25 @@ export async function findByIdsOwnedUnconsumed(
     );
 }
 
+/**
+ * Ownership-only lookup (no `consumedAt` check) — used for attachment
+ * targets that aren't tracked by the pet-photo consumption mechanism,
+ * e.g. a user avatar (contract §8.2, R-15). Re-setting the same avatar
+ * (or an upload consumed elsewhere) is not an error here.
+ */
+export async function findByIdOwned(
+  db: Executor,
+  id: string,
+  uploaderId: string,
+): Promise<UploadRow | undefined> {
+  const [row] = await db
+    .select()
+    .from(uploads)
+    .where(and(eq(uploads.id, id), eq(uploads.uploaderId, uploaderId)))
+    .limit(1);
+  return row;
+}
+
 export async function markConsumed(db: Executor, ids: string[], when: Date): Promise<void> {
   if (ids.length === 0) return;
   await db.update(uploads).set({ consumedAt: when }).where(inArray(uploads.id, ids));

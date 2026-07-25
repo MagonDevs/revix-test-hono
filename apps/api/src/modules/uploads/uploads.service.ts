@@ -144,3 +144,17 @@ export function verifyOwnedUnconsumed(
 export function consumeUploads(db: Executor, uploadIds: string[], when: Date): Promise<void> {
   return repo.markConsumed(db, uploadIds, when);
 }
+
+/**
+ * Cross-module entry point for `modules/users` (R-15, contract §8.2):
+ * an avatar upload need only be owned by the caller — unlike pet
+ * photos it isn't tracked by `consumedAt`, so re-setting the same
+ * avatar (or one already used elsewhere) is not rejected.
+ */
+export function verifyOwned(
+  db: Executor,
+  uploadId: string,
+  callerId: string,
+): ResultAsync<UploadRow | undefined, AppError> {
+  return ResultAsync.fromPromise(repo.findByIdOwned(db, uploadId, callerId), toAppError);
+}

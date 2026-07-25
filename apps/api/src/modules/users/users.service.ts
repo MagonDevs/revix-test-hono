@@ -1,6 +1,7 @@
 import { ResultAsync } from "neverthrow";
 import { AppErrors, type AppError } from "../../errors/app-error.js";
-import { toAppError } from "../../trpc/unwrap.js";
+import { DomainThrow, toAppError } from "../../trpc/unwrap.js";
+import { verifyOwned } from "../uploads/index.js";
 import { mapSessionUser, mapUserProfile } from "./users.mapper.js";
 import * as repo from "./users.repository.js";
 import type { UserUpdatePatch } from "./users.repository.js";
@@ -25,28 +26,42 @@ export function getUserProfile(db: Executor, userId: string): ResultAsync<UserPr
 
 /**
  * `undefined` (field omitted from input) means "unchanged"; explicit
- * `null` means "clear it" — contract §8.2. `avatarUploadId`: TODO(B6) —
- * the uploads module (and R-15's ownership check) doesn't exist yet, so
- * this is wired straight through to `user.image` as the raw upload id
- * rather than a resolved public URL, with no ownership verification.
- * Must be replaced once uploads land.
+ * `null` means "clear it" — contract §8.2. `avatarUploadId`: R-15 — a
+ * non-null id must be owned by the caller (checked via the uploads
+ * module's public API, same cross-module pattern B6 used for pet
+ * photos), and resolves to the upload's public URL, the same
+ * `/api/uploads/<id>/raw` shape `uploads.service.toUploadOutput` uses.
+ * Unlike pet photos, an avatar isn't tracked by `consumedAt` — reusing
+ * or re-setting an upload here never errors.
  */
 export function updateMe(
   db: Executor,
   userId: string,
   input: UsersUpdateMeInput,
 ): ResultAsync<SessionUser, AppError> {
-  const patch: UserUpdatePatch = {};
-  if (input.name !== undefined) patch.name = input.name;
-  if (input.city !== undefined) patch.city = input.city;
-  if (input.phone !== undefined) patch.phone = input.phone;
-  if (input.bio !== undefined) patch.bio = input.bio;
-  // TODO(B6): resolve avatarUploadId -> the upload's public URL, and
-  // verify the upload belongs to `userId` (R-15), before assigning it.
-  if (input.avatarUploadId !== undefined) patch.image = input.avatarUploadId;
-
   return ResultAsync.fromPromise(
     (async () => {
+      const patch: UserUpdatePatch = {};
+      if (input.name !== undefined) patch.name = input.name;
+      if (input.city !== undefined) patch.city = input.city;
+      if (input.phone !== undefined) patch.phone = input.phone;
+      if (input.bio !== undefined) patch.bio = input.bio;
+
+      if (input.avatarUploadId !== undefined) {
+        if (input.avatarUploadId === null) {
+          patch.image = null;
+        } else {
+          const ownedResult = await verifyOwned(db, input.avatarUploadId, userId);
+          if (ownedResult.isErr()) throw new DomainThrow(ownedResult.error);
+          if (!ownedResult.value) {
+            throw new DomainThrow(
+              AppErrors.invalidField("avatarUploadId", "Upload not found or not owned by you"),
+            );
+          }
+          patch.image = `/api/uploads/${input.avatarUploadId}/raw`;
+        }
+      }
+
       const row = await repo.updateUser(db, userId, patch);
       if (!row) throw new UserNotFound();
       const availablePetCount = await repo.countAvailablePets(db, userId);

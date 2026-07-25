@@ -9,6 +9,7 @@ export {
   getUploadBytes,
   isAllowedMime,
   sniffMime,
+  verifyOwned,
   verifyOwnedUnconsumed,
 } from "./uploads.service.js";
 export type { CreateUploadDeps } from "./uploads.service.js";

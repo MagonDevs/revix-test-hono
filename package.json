@@ -17,8 +17,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:migrate": "echo 'db:migrate is a no-op until apps/api exists (B1)' && exit 0",
-    "db:seed": "echo 'db:seed is a no-op until apps/api exists (B4)' && exit 0",
-    "db:reset": "echo 'db:reset is a no-op until apps/api exists (B4)' && exit 0",
+    "db:seed": "pnpm --filter @adopta/api db:seed",
+    "db:reset": "pnpm --filter @adopta/api db:reset",
     "prepare": "husky"
   },
   "devDependencies": {

@@ -23,10 +23,11 @@ describe("appRouter.meta.breeds", () => {
     expect(result.items.length).toBeGreaterThan(0);
   });
 
-  it("returns an empty list for a species with no curated breeds", async () => {
+  it("returns a valid output for the 'other' species (B4: now has curated entries)", async () => {
     const caller = appRouter.createCaller(makeContext());
     const result = await caller.meta.breeds({ species: "other" });
-    expect(result).toEqual({ items: [] });
+    expect(() => metaBreedsOutputSchema.parse(result)).not.toThrow();
+    expect(result.items.length).toBeGreaterThan(0);
   });
 
   it("rejects unknown input keys (strict input schema)", async () => {

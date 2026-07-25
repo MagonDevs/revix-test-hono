@@ -4,19 +4,13 @@ import {
   metaBreedsOutputSchema,
 } from "@adopta/contracts";
 import { usersRouter } from "../modules/users/index.js";
+import { BREEDS_BY_SPECIES } from "../seed/data/breeds.js";
 import { publicProcedure, router } from "./init.js";
 
 // Curated per-species suggestion list for a free-text combobox (contract
 // §8.6). Not authoritative — `pet.breed` accepts any string within its
-// length limit. Full curated lists are seeding/B4 scope; this is a stub
-// that proves the router works end-to-end.
-const BREEDS_BY_SPECIES: Record<string, string[]> = {
-  dog: ["Labrador Retriever", "German Shepherd", "Poodle", "Bulldog"],
-  cat: ["Domestic Shorthair", "Siamese", "Maine Coon"],
-  rabbit: ["Holland Lop", "Netherland Dwarf"],
-  bird: ["Budgerigar", "Cockatiel"],
-  other: [],
-};
+// length limit. Sourced from seed/data/breeds.ts so the seeded pets and
+// this endpoint never drift apart (B4).
 
 const metaRouter = router({
   breeds: publicProcedure

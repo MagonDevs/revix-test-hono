@@ -30,7 +30,7 @@ export function getUserProfile(db: Executor, userId: string): ResultAsync<UserPr
  * non-null id must be owned by the caller (checked via the uploads
  * module's public API, same cross-module pattern B6 used for pet
  * photos), and resolves to the upload's public URL, the same
- * `/api/uploads/<id>/raw` shape `uploads.service.toUploadOutput` uses.
+ * `/api/v1/uploads/<id>/raw` shape `uploads.service.toUploadOutput` uses.
  * Unlike pet photos, an avatar isn't tracked by `consumedAt` — reusing
  * or re-setting an upload here never errors.
  */
@@ -58,7 +58,7 @@ export function updateMe(
               AppErrors.invalidField("avatarUploadId", "Upload not found or not owned by you"),
             );
           }
-          patch.image = `/api/uploads/${input.avatarUploadId}/raw`;
+          patch.image = `/api/v1/uploads/${input.avatarUploadId}/raw`;
         }
       }
 

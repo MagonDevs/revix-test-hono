@@ -2,7 +2,7 @@ import type { Species } from "#contracts";
 
 // Curated per-species suggestion list for a free-text combobox (contract
 // §8.6). Not authoritative — `pet.breed` accepts any string within its
-// length limit. Backs both `meta.breeds` (trpc/router.ts) and the seeder's
+// length limit. Backs both `GET /meta/breeds` and the seeder's
 // pet factory, so seeded pets and this endpoint never drift apart (B4).
 // Previously lived under `src/seed/data/breeds.ts`; moved here because
 // production request-handling code (`meta.breeds`) must not depend on the

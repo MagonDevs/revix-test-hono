@@ -96,7 +96,7 @@ describe("mapAdoptionRequest", () => {
     const row = makeRow();
     expect(mapAdoptionRequest(row, photo, adopter.id).pet.coverPhoto).toEqual({
       id: "photo-1",
-      url: "/api/uploads/upload-1/raw",
+      url: "/api/v1/uploads/upload-1/raw",
       alt: "Rex sitting",
       width: 800,
       height: 600,
@@ -110,7 +110,7 @@ describe("mapAdoptionRequest", () => {
     const result = mapAdoptionRequest(row, null, adopter.id);
     expect(result.id).toBe("req-1");
     expect(result.status).toBe("accepted");
-    expect(result.respondedAt).toEqual(respondedAt);
+    expect(result.respondedAt).toEqual(respondedAt.toISOString());
     expect(result.pet).toMatchObject({ id: "pet-1", name: "Rex", status: "available" });
   });
 });

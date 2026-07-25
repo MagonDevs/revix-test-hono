@@ -57,7 +57,7 @@ export function mapAdoptionRequest(
     adopter: mapUserSummary(row.adopter),
     guardian: mapUserSummary(row.guardian),
     contact,
-    createdAt: row.createdAt,
-    respondedAt: row.respondedAt,
+    createdAt: row.createdAt.toISOString(),
+    respondedAt: row.respondedAt?.toISOString() ?? null,
   };
 }

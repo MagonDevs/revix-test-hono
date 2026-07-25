@@ -52,7 +52,7 @@ describe("mapPetPhoto", () => {
   it("builds the raw-upload url and preserves order-relevant fields", () => {
     expect(mapPetPhoto(photoRow)).toEqual({
       id: "photo-1",
-      url: "/api/uploads/upload-1/raw",
+      url: "/api/v1/uploads/upload-1/raw",
       alt: "Rex sitting",
       width: 800,
       height: 600,
@@ -80,7 +80,7 @@ describe("mapPet", () => {
       name: "Ana",
       city: "Madrid",
       avatarUrl: null,
-      createdAt: guardian.createdAt,
+      createdAt: guardian.createdAt.toISOString(),
     });
     expect(pet.guardian).not.toHaveProperty("email");
     expect(pet.guardian).not.toHaveProperty("phone");

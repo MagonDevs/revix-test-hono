@@ -26,7 +26,7 @@ describe("mapUserSummary", () => {
       name: "Ana",
       city: "Madrid",
       avatarUrl: null,
-      createdAt: row.createdAt,
+      createdAt: row.createdAt.toISOString(),
     });
   });
 });

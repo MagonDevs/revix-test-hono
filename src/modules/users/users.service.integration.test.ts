@@ -82,7 +82,7 @@ describe("users.service.updateMe — avatarUploadId (requires Docker)", () => {
       const result = await service.updateMe(tx, owner, { avatarUploadId: uploadId });
 
       expect(result.isOk()).toBe(true);
-      if (result.isOk()) expect(result.value.avatarUrl).toBe(`/api/uploads/${uploadId}/raw`);
+      if (result.isOk()) expect(result.value.avatarUrl).toBe(`/api/v1/uploads/${uploadId}/raw`);
     });
   });
 

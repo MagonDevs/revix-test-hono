@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { v7 as uuidv7 } from "uuid";
 import { LIMITS } from "#contracts";
 import { env } from "../../config/env.js";
 import { db } from "../../db/client.js";
@@ -41,5 +42,14 @@ export const auth = betterAuth({
     },
   },
   session: { expiresIn: 60 * 60 * 24 * 30, updateAge: 60 * 60 * 24 },
-  advanced: { cookiePrefix: "adopta" },
+  advanced: {
+    cookiePrefix: "adopta",
+    // Better Auth's default id generator emits its own random string, but
+    // the contract types every id — users included — as a UUID
+    // (contracts/primitives.ts), and `user.id` is echoed on every
+    // `UserSummary`. Generating uuidv7 here keeps the auth-owned tables
+    // in the same id space as everything else; the columns are `text`, so
+    // this is a value change only, not a schema one.
+    database: { generateId: () => uuidv7() },
+  },
 });

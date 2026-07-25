@@ -46,7 +46,7 @@ export interface ViewerFlags {
 export function mapPetPhoto(row: PetPhotoRow): PetPhoto {
   return {
     id: row.id,
-    url: `/api/uploads/${row.uploadId}/raw`,
+    url: `/api/v1/uploads/${row.uploadId}/raw`,
     alt: row.alt ?? null,
     width: row.width,
     height: row.height,
@@ -81,8 +81,8 @@ export function mapPet(row: PetRow, photos: PetPhotoRow[], viewerFlags: ViewerFl
     isFavourited: viewerFlags.isFavourited,
     viewerRequestStatus: viewerFlags.viewerRequestStatus,
     guardian: mapUserSummary(row.guardian),
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 

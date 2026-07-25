@@ -1,10 +1,9 @@
 // Module public API (architecture §2.1 — "nothing outside a module may
-// import that module's internals"). Kept minimal: nothing outside this
-// module needs pets data yet (B6 setStatus and B7 adoptionRequests are
-// future work inside/adjacent to this module and can import
-// pets.domain.ts / pets.repository.ts directly when they land).
+// import that module's internals"). The HTTP layer reaches this module
+// through `petsService`; the rest is the cross-module surface other
+// modules depend on.
 
-export { petsRouter } from "./pets.router.js";
+export * as petsService from "./pets.service.js";
 export { mapPet, mapPetPhoto } from "./pets.mapper.js";
 export type { PetPhotoRow, PetRow, ViewerFlags } from "./pets.mapper.js";
 export { isLegalTransition } from "./pets.domain.js";

@@ -53,7 +53,7 @@ function storageKeyFor(id: string, now: Date): string {
 function toUploadOutput(row: UploadRow): Upload {
   return {
     id: row.id,
-    url: `/api/uploads/${row.id}/raw`,
+    url: `/api/v1/uploads/${row.id}/raw`,
     width: row.width,
     height: row.height,
     byteSize: row.byteSize,

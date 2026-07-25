@@ -22,7 +22,9 @@ export function mapUserSummary(row: UserRow): UserSummary {
     name: row.name,
     city: row.city,
     avatarUrl: row.image ?? null,
-    createdAt: row.createdAt,
+    // The wire carries RFC 3339 strings, not `Date`s — see
+    // contracts/primitives.ts.
+    createdAt: row.createdAt.toISOString(),
   };
 }
 

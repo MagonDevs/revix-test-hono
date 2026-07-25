@@ -1,7 +1,6 @@
-// Module public API (architecture §2.1). Nothing outside this module
-// needs adoptionRequests data yet — export the router at minimum.
+// Module public API (architecture §2.1).
 
-export { adoptionRequestsRouter } from "./adoption-requests.router.js";
+export * as adoptionRequestsService from "./adoption-requests.service.js";
 // Cross-module surface for `modules/pets` (architecture §6.1 — R-6):
 // declining a pet's pending requests when it becomes adopted must run in
 // the same transaction as the pet's status write, so this is the

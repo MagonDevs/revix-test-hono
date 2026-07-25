@@ -1,9 +1,12 @@
-import type { ErrorData } from "#contracts";
+import { AppErrors } from "../../errors/app-error.js";
+import type { AppError } from "../../errors/app-error.js";
 
 // Architecture §5.4 / contract §7.1-7.2 — Better Auth's native error
-// responses must be rewritten into the standard AppError wire shape
-// before reaching the client. This module is the pure rewrite function;
-// `http/routes/auth.route.ts` is the thin HTTP wrapper that calls it.
+// responses must be rewritten into an `AppError` before reaching the
+// client, so the auth endpoints answer in exactly the same envelope as
+// every other endpoint. This module is the pure rewrite function;
+// `http/routes/auth.route.ts` is the thin HTTP wrapper that calls it and
+// lets the shared error handler render the result.
 //
 // Verified against the installed better-auth@1.6.25 source
 // (dist/api/routes/sign-up.mjs, dist/api/routes/sign-in.mjs):
@@ -23,12 +26,6 @@ export interface BetterAuthErrorInput {
   status: number;
   /** Parsed JSON body from Better Auth's response, or null if unparsable. */
   body: unknown;
-  requestId: string;
-}
-
-export interface NormalisedAuthError {
-  status: number;
-  body: { error: { message: string; data: ErrorData } };
 }
 
 function bodyCode(body: unknown): string | undefined {
@@ -67,55 +64,28 @@ function isBadCredentials(status: number, body: unknown): boolean {
 }
 
 /**
- * Rewrites a non-2xx response from `auth.handler()` into the contract's
- * error shape. Callers should only invoke this for non-ok responses —
- * successful responses (including their Set-Cookie headers) must pass
- * through untouched.
+ * Rewrites a non-2xx response from `auth.handler()` into an `AppError`.
+ * Callers should only invoke this for non-ok responses — successful
+ * responses (including their Set-Cookie headers) must pass through
+ * untouched.
+ *
+ * Anything unrecognised falls through to `internal_error` deliberately:
+ * an auth failure this layer doesn't understand must not be guessed at
+ * and handed to the client as if it were the user's fault.
  */
-export function normaliseBetterAuthError(input: BetterAuthErrorInput): NormalisedAuthError {
+export function normaliseBetterAuthError(input: BetterAuthErrorInput): AppError {
   const isSignUp = input.path.includes("/sign-up");
   const isSignIn = input.path.includes("/sign-in");
 
   if (isSignUp && isDuplicateEmail(input.status, input.body)) {
-    const message = "An account with this email already exists";
-    return {
-      status: 409,
-      body: {
-        error: {
-          message,
-          data: {
-            appCode: "conflict",
-            conflictReason: "duplicate_email",
-            fieldErrors: [{ field: "email", message }],
-            requestId: input.requestId,
-          },
-        },
-      },
-    };
+    return AppErrors.conflict("duplicate_email", "An account with this email already exists");
   }
 
   if (isSignIn && isBadCredentials(input.status, input.body)) {
-    // R-21: identical message regardless of which of email/password was
+    // R-21: identical error regardless of which of email/password was
     // wrong — never reveal whether the email is registered.
-    const message = "Invalid email or password";
-    return {
-      status: 401,
-      body: {
-        error: {
-          message,
-          data: { appCode: "unauthenticated", requestId: input.requestId },
-        },
-      },
-    };
+    return AppErrors.unauthenticated("Invalid email or password");
   }
 
-  return {
-    status: 500,
-    body: {
-      error: {
-        message: "Internal error",
-        data: { appCode: "internal_error", requestId: input.requestId },
-      },
-    },
-  };
+  return AppErrors.internal(`Unhandled auth failure (${String(input.status)}) at ${input.path}`);
 }

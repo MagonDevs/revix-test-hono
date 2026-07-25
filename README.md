@@ -1,205 +1,131 @@
 # adopta-api
 
-The Adopta pet-adoption backend: Hono + tRPC v11 on Node 22, Postgres 16 via
-Drizzle, Better Auth for sessions, sharp for image processing. Implements
-every procedure in `01-api-contract.md` §8.
+Backend for **Adopta**, a pet-adoption listing platform: people publish pets that need a home,
+others send an adoption request to the person caring for that pet.
 
-A single standalone package — no workspace, no publishable sub-packages. See
-[Structure](#structure) and `docs/notes/architecture-divergences.md` for why
-this differs from the original spec's multi-package layout.
+## Why this repo exists
 
-## Structure
+**Every line of code here was written by Claude, autonomously, from a written spec.** This is the
+backend half of a two-repo pair — see [adopta-web](https://github.com/MagonDevs/revix-test-tanstack)
+for the frontend and the full "why" — built to test **[Revix](https://userevix.com)**, AI code
+review that reads your whole codebase, not just the diff, the way a senior engineer would.
 
-```
-adopta-api/
-├─ src/
-│  ├─ contracts/     # the API contract as code — zod schemas, enums, error shapes (leaf-level, zod only)
-│  ├─ config/ lib/ errors/ ports/ adapters/ db/ http/ trpc/ modules/ seed/ scripts/
-│  └─ index.ts       # entry point
-├─ package.json
-├─ tsconfig.json
-├─ eslint.config.js
-├─ vitest.config.ts, vitest.integration.config.ts, drizzle.config.ts
-├─ Dockerfile, docker-entrypoint.sh, docker-compose.yml
-└─ docs/
-```
+## Stack
+
+Hono · Node 22 · Postgres 16 via Drizzle · Better Auth · sharp for images. A single standalone
+package, no workspace. The public surface is a plain JSON REST API under `/api/v1`.
 
 ## Setup
 
 ```bash
 pnpm install
-cp .env.example .env             # edit as needed
+cp .env.example .env
 docker compose up -d postgres    # or point DATABASE_URL at any Postgres 16
-pnpm db:migrate
 pnpm db:reset                    # migrate + seed the demo scenario
-pnpm dev                         # tsx watch src/index.ts
+pnpm dev
 ```
 
-The server listens on `PORT` (default `8787`). Health checks: `GET /health`,
-`GET /ready`.
+Listens on `PORT` (default `8787`). Health checks: `GET /health`, `GET /ready`.
+Demo account: `marta@example.com` / `password123`.
 
-`.env` is loaded automatically — `src/config/load-env.ts` (a thin wrapper
-around `dotenv`) is imported as the first statement of every entry point
-(`src/index.ts`, `src/db/migrate.ts`, `src/seed/index.ts`,
-`src/scripts/sweep-uploads.ts`), before `src/config/env.ts` parses
-`process.env`. Real environment variables (shell exports, Docker, CI/prod)
-always take precedence over `.env` values, and a missing `.env` file is a
-silent no-op — so this has no effect in production or Docker, where config
-comes from real env vars.
-
-## Scripts (`package.json`)
-
-| Script             | What it does                                                                                                                                                             |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `dev`              | `tsx watch src/index.ts` — run the server locally with auto-restart                                                                                                      |
-| `typecheck`        | `tsc --noEmit`                                                                                                                                                           |
-| `build`            | `tsc -p tsconfig.json` — compiles `src/` to `dist/`; the container runtime runs the compiled output, see [Docker](#running-with-docker-compose)                          |
-| `lint`             | `eslint .`                                                                                                                                                               |
-| `test`             | `vitest run`, excluding `*.integration.test.ts` — no Docker/DB required                                                                                                  |
-| `test:integration` | `vitest run -c vitest.integration.config.ts` — spins up a real Postgres via Testcontainers, requires a Docker daemon                                                     |
-| `validate`         | `typecheck && lint && test`                                                                                                                                              |
-| `db:generate`      | `drizzle-kit generate` — generates a new migration from schema changes; review the SQL by hand before committing                                                         |
-| `db:migrate`       | `tsx src/db/migrate.ts` — applies all pending migrations                                                                                                                 |
-| `db:seed`          | `tsx src/seed/index.ts` — seeds a scenario (`--scenario`, `--images`, `--reset`; see below)                                                                              |
-| `db:reset`         | `tsx src/seed/index.ts --reset` — drops and recreates the schema, then seeds the demo scenario                                                                           |
-| `sweep:uploads`    | `tsx src/scripts/sweep-uploads.ts` — deletes unreferenced (`consumed_at IS NULL`) uploads older than 24h. A deployment concern to schedule (cron), not run automatically |
-
-## Environment variables (`src/config/env.ts`)
-
-Validated with Zod at process start; the process exits with a readable
-message if anything is missing or malformed.
-
-| Var                 | Default                 | Description                                                                                                                                                                              |
-| ------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`          | `development`           | `development` \| `test` \| `production`. Controls pino's pretty-printing.                                                                                                                |
-| `PORT`              | `8787`                  | HTTP port the server listens on.                                                                                                                                                         |
-| `DATABASE_URL`      | — (required)            | Postgres connection string, must start with `postgres`.                                                                                                                                  |
-| `DATABASE_POOL_MAX` | `10`                    | Max size of the `pg` connection pool (`db/client.ts`).                                                                                                                                   |
-| `AUTH_SECRET`       | — (required, ≥32 chars) | Better Auth's signing secret. Never log this; never commit a real value.                                                                                                                 |
-| `PUBLIC_ORIGIN`     | — (required, URL)       | The **client's** public origin — used as Better Auth's `baseURL`/`trustedOrigins` and the API's CORS `origin`. Not this API's own origin; see [Client integration](#client-integration). |
-| `STORAGE_DRIVER`    | `local`                 | `local` \| `s3`. Only `local` (`LocalStorageAdapter`) is implemented; `s3` is a second `StoragePort` implementation, not yet written.                                                    |
-| `STORAGE_LOCAL_DIR` | `./.storage`            | Filesystem root for the local storage adapter.                                                                                                                                           |
-| `LOG_LEVEL`         | `info`                  | pino level: `debug` \| `info` \| `warn` \| `error`.                                                                                                                                      |
-| `SEED_SCENARIO`     | `demo`                  | Default `--scenario` for `db:seed` when not passed on the CLI.                                                                                                                           |
-| `SEED_IMAGE_MODE`   | `ingest`                | Default `--images` for `db:seed`: `ingest` (download real images), `remote` (store provider URLs), `offline` (no network, CI-safe).                                                      |
-
-## Seed scenarios
-
-Run with `pnpm db:seed --scenario=<name> --images=<mode> [--reset]`, or
-`pnpm db:reset` as a `--scenario=demo --reset` alias.
-
-| Scenario | What it produces                                                                                                                                                                 |
-| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `demo`   | ~40 pets across several guardians, real image bytes (by default), a handful of adoption requests and favourites in a realistic mix of statuses. Includes the demo account below. |
-| `empty`  | Schema only, zero rows — for exercising empty-state responses.                                                                                                                   |
-| `large`  | ~5,000 pets with `offline` images, for pagination/index/performance testing (`EXPLAIN ANALYZE` targets this).                                                                    |
-| `edge`   | Every boundary value in the contract's `LIMITS` (max-length strings, min/max ages and weights, etc.).                                                                            |
-
-Seeding is idempotent: user creation looks up an existing row by email
-before calling `auth.api.signUpEmail`, and pet/photo/request/favourite
-inserts use `ON CONFLICT DO NOTHING` against deterministic seeded ids — a
-second run without `--reset` does not duplicate rows.
-
-### Demo credentials
-
-```
-email:    marta@example.com
-password: password123
+```bash
+pnpm typecheck
+pnpm lint
+pnpm test              # unit, no DB required
+pnpm test:integration  # Testcontainers, requires Docker
+pnpm validate          # typecheck + lint + test
+pnpm build
+pnpm db:seed --scenario=<demo|empty|large|edge> --images=<ingest|remote|offline> [--reset]
 ```
 
-(`src/seed/scenarios/demo.ts`). Signs in via `POST /api/auth/sign-in/email`.
+## Environment variables
 
-## Running with Docker Compose
+Validated with Zod at process start — the process exits with a readable message if anything's
+missing or malformed.
+
+| Var                 | Default                 | Notes                                                                                 |
+| ------------------- | ----------------------- | ------------------------------------------------------------------------------------- |
+| `DATABASE_URL`      | — (required)            | Postgres connection string.                                                           |
+| `AUTH_SECRET`       | — (required, ≥32 chars) | Better Auth's signing secret.                                                         |
+| `PUBLIC_ORIGIN`     | — (required, URL)       | The **client's** public origin, not this API's — drives Better Auth's `baseURL`/CORS. |
+| `PORT`              | `8787`                  |                                                                                       |
+| `STORAGE_DRIVER`    | `local`                 | `local` \| `s3` (`s3` not yet implemented).                                           |
+| `STORAGE_LOCAL_DIR` | `./.storage`            |                                                                                       |
+| `LOG_LEVEL`         | `info`                  |                                                                                       |
+| `SEED_SCENARIO`     | `demo`                  | Default `--scenario` for `db:seed`.                                                   |
+| `SEED_IMAGE_MODE`   | `ingest`                | Default `--images` for `db:seed`.                                                     |
+
+## API surface
+
+Everything versioned lives under `/api/v1`; `/health` and `/ready` deliberately do not, so an
+orchestrator probing them isn't coupled to the client-facing contract.
+
+| Method   | Path                                   | Auth | Body / query                                                                     | Success                            |
+| -------- | -------------------------------------- | ---- | -------------------------------------------------------------------------------- | ---------------------------------- |
+| `POST`   | `/auth/register`                       | —    | `name`, `email`, `password`, `city`                                              | `201` SessionUser                  |
+| `POST`   | `/auth/login`                          | —    | `email`, `password`                                                              | `200` SessionUser                  |
+| `POST`   | `/auth/logout`                         | —    | —                                                                                | `204`                              |
+| `GET`    | `/auth/session`                        | ✓    | —                                                                                | `200` SessionUser                  |
+| `GET`    | `/meta/breeds`                         | —    | `species`                                                                        | `200` `{ items }`                  |
+| `GET`    | `/pets`                                | opt  | `q`, `species[]`, `size[]`, `sex`, `ageGroup`, `city`, `sort`, `page`, `perPage` | `200` Paginated\<Pet\>             |
+| `POST`   | `/pets`                                | ✓    | CreatePet                                                                        | `201` Pet                          |
+| `GET`    | `/pets/:petId`                         | opt  | —                                                                                | `200` Pet                          |
+| `PATCH`  | `/pets/:petId`                         | ✓    | any subset of CreatePet                                                          | `200` Pet                          |
+| `DELETE` | `/pets/:petId`                         | ✓    | —                                                                                | `204`                              |
+| `PATCH`  | `/pets/:petId/status`                  | ✓    | `status`, `declinePendingRequests`                                               | `200` Pet                          |
+| `GET`    | `/me/pets`                             | ✓    | `status`, `sort`, `page`, `perPage`                                              | `200` Paginated\<OwnedPet\>        |
+| `PATCH`  | `/users/me`                            | ✓    | `name`, `city`, `phone`, `bio`, `avatarUploadId`                                 | `200` SessionUser                  |
+| `GET`    | `/users/:userId`                       | —    | —                                                                                | `200` UserProfile                  |
+| `GET`    | `/users/:userId/pets`                  | opt  | `page`, `perPage`                                                                | `200` Paginated\<Pet\>             |
+| `POST`   | `/pets/:petId/adoption-requests`       | ✓    | `message`                                                                        | `201` AdoptionRequest              |
+| `GET`    | `/me/adoption-requests`                | ✓    | `role` (required), `status`, `petId`, `page`, `perPage`                          | `200` Paginated\<AdoptionRequest\> |
+| `GET`    | `/adoption-requests/:requestId`        | ✓    | —                                                                                | `200` AdoptionRequest              |
+| `PATCH`  | `/adoption-requests/:requestId/status` | ✓    | `status`, `reservePet`                                                           | `200` AdoptionRequest              |
+| `DELETE` | `/adoption-requests/:requestId`        | ✓    | — (withdraw)                                                                     | `204`                              |
+| `GET`    | `/me/favourites`                       | ✓    | `page`, `perPage`                                                                | `200` Paginated\<Pet\>             |
+| `PUT`    | `/me/favourites/:petId`                | ✓    | —                                                                                | `204`                              |
+| `DELETE` | `/me/favourites/:petId`                | ✓    | —                                                                                | `204`                              |
+| `POST`   | `/uploads`                             | ✓    | multipart, field `file`                                                          | `201` Upload                       |
+| `GET`    | `/uploads/:uploadId/raw`               | —    | —                                                                                | `200` bytes                        |
+
+### Conventions
+
+- **Errors** are always `{ "error": { code, message, requestId, details?, conflictReason?,
+retryAfterSeconds? } }`. `code` is one of `validation_error`, `unauthenticated`, `forbidden`,
+  `not_found`, `conflict`, `rate_limited`, `internal_error`, and always agrees with the HTTP
+  status. `details` carries per-field messages on a validation failure; `requestId` matches the
+  `x-request-id` response header and the server log line.
+- **Timestamps** are RFC 3339 strings (`2026-07-25T10:30:00.000Z`) — plain JSON, no custom
+  transformer. All ids are UUIDs.
+- **Sessions** are cookie-based (Better Auth). Send credentials on every request;
+  `PUBLIC_ORIGIN` must match the origin the browser actually talks to, or cookies/CSRF break.
+- Every `/api/v1/*` response is `Cache-Control: private, no-store` — viewer-dependent fields
+  (`isFavourited`, `viewerRequestStatus`, `contact`) are computed per request, never cached. The
+  one exception is `/uploads/:uploadId/raw`, which is immutable and cached for a year.
+- No shared package: a client builds its own types from the Zod contracts in `src/contracts/`.
+
+## Docker
 
 ```bash
 docker compose up
 ```
 
-From a clean checkout this builds `Dockerfile` (multi-stage, `node:22-alpine`,
-runs the compiled `dist/` output with plain `node`), starts Postgres 16, and
-— via `docker-entrypoint.sh` — runs migrations, then an idempotent seed
-(`SEED_SCENARIO`, default `demo`), then starts the server on `:8787`.
-Override `AUTH_SECRET`/`PUBLIC_ORIGIN`/`SEED_SCENARIO`/`SEED_IMAGE_MODE` via
-a `.env` file or shell environment; see `docker-compose.yml`'s `api` service
-for the full default set.
+Builds the image, starts Postgres, runs migrations + an idempotent seed, starts the server on
+`:8787`. **Status: unverified-pending-Docker** — no Docker daemon was available in the environment
+this was built in, so this hasn't been run end-to-end; believed correct from reading the
+Dockerfile/entrypoint/seed idempotency, not confirmed live.
 
-**Status: unverified-pending-Docker.** No Docker daemon is available in the
-environment this was authored/refactored in, so `docker compose up` has not
-actually been run end-to-end. The Dockerfile and compose file are believed
-correct (they mirror the package's real install/build/run commands and the
-entrypoint's idempotency is backed by the seed factories' own idempotency
-guarantees, verified by reading `user.factory.ts` and `scenarios/demo.ts`),
-but this needs a real run to confirm before relying on it for CI or a
-deploy.
+## Known gaps
 
-## Client integration
+Honest handover list — everything below needs a real run to confirm, not yet done:
 
-This is a standalone backend with no publishable packages — there is no
-`@adopta/contracts` or `@adopta/api/trpc` to install. A prior phase of this
-project assumed a separate web-client team would consume this repo's types
-directly; that stopped being true (the client now maintains its own contract
-types), so those export surfaces were removed. See
-`docs/notes/architecture-divergences.md` for the history.
+- `docker compose up` end-to-end (needs a Docker daemon). `pnpm test:integration` now runs green
+  against Testcontainers.
+- `EXPLAIN ANALYZE` on the `large` (5,000-pet) scenario's heaviest queries.
+- The full uploads flow (publish → edit → reorder → delete) against a running server with real
+  image bytes — exercised via tests, not manually.
+- Rate limiting is in-memory/single-process — needs a shared store (Redis) before it means
+  anything behind more than one instance.
 
-The client integrates purely over HTTP:
-
-- **tRPC**: every procedure is served under `POST /trpc/<path>` using
-  `superjson` as the transformer. A client builds its own request/response
-  types (e.g. by hand, by codegen against the running server, or by copying
-  the relevant Zod shapes) — there is no shared `AppRouter` type export.
-- **Plain HTTP routes** (not tRPC):
-  - `POST /api/auth/sign-up/email` — Better Auth email+password sign-up.
-  - `POST /api/auth/sign-in/email` — sign-in; sets the `adopta.session_token` cookie (prefix from `advanced.cookiePrefix` in `auth.config.ts`; exact name pending a live round-trip, see `docs/notes/better-auth.md`).
-  - `POST /api/auth/sign-out` — invalidates the session.
-  - `POST /api/uploads` — authenticated multipart upload (field name `file`); `GET /api/uploads/:uploadId/raw` — serves the processed image bytes with an immutable cache header.
-  - (All of `/api/auth/*` is rate-limited at 50 req/15 min/IP; `/api/uploads` at 30/hour/user; `adoptionRequests.create` — a tRPC mutation — at 20/hour/user, see `src/trpc/init.ts`.)
-- **`PUBLIC_ORIGIN`**: the client's own public origin, not the API's. It
-  drives Better Auth's `baseURL`/`trustedOrigins` (so cookies and CSRF
-  checks line up with the origin the browser actually talks to) and the
-  API's CORS `origin` header. Architecture §5.2 — the client is expected to
-  sit behind a proxy such that this origin is what the browser actually
-  talks to; get this wrong and cookies/CSRF break. The client team should
-  tell us their deployed origin(s); we set this per environment.
-- **E2E CI seed command**: `pnpm db:seed --scenario=demo --reset` gives a
-  clean, deterministic `demo` dataset (including the demo credentials above)
-  for end-to-end runs against a throwaway database.
-- Every `/trpc/*` response carries `Cache-Control: private, no-store`
-  (asserted by a test) — the client should never cache a tRPC response
-  itself; viewer-dependent fields (`isFavourited`, `viewerRequestStatus`,
-  `contact`) are computed per request server-side and must not be reused
-  across users on the client either.
-
-## Known gaps / unverified-pending-Docker (all phases)
-
-Consolidated for anyone picking this up with real Docker/DB access:
-
-- **Docker**: `docker compose up` end-to-end (see above), including the
-  runtime-stage `package.json` `imports` rewrite in `Dockerfile` (see its
-  header comment for why that rewrite exists).
-- **Testcontainers-backed tests**: `test:integration` requires a real Docker
-  daemon to start Postgres via Testcontainers — not run in this environment;
-  rely on `pnpm test` (unit, no DB) having been green plus a careful read of
-  the SQL/migrations instead.
-- **Better Auth**: the exact session cookie name and the generated auth
-  schema's shape were verified against the pinned package version's
-  source/docs (`docs/notes/better-auth.md`) but not against a live sign-in
-  round trip in a browser — do that once before the client team integrates.
-- **Seed images**: `ingest`/`remote` image modes depend on external provider
-  URLs being reachable; only `offline` mode was exercised without live
-  network access in this environment.
-- **Performance**: `EXPLAIN ANALYZE` against the `large` scenario (5,000
-  pets) was not run live in this environment; the query/index review (see
-  `src/modules/*/repository.ts` vs. `data-model.md`'s indexes table) is a
-  static read, not a captured query plan. Re-run `EXPLAIN ANALYZE` on the
-  six heaviest queries against a real `large`-seeded database and confirm no
-  sequential scan before relying on the "single-digit milliseconds" DoD.
-- **Uploads**: the full publish → fetch → edit → reorder → status walk →
-  delete flow was exercised via the test suite, not manually against a
-  running server with real image bytes in this environment.
-- **Rate limiting**: all three limiters (auth, uploads,
-  `adoptionRequests.create`) are in-memory, single-process fixed-window
-  implementations — correct for a single instance, **not** safe across
-  multiple replicas. A production deploy with more than one instance needs a
-  shared store (e.g. Redis) before these limits are meaningful; documented
-  at each limiter's definition (`http/middleware/rate-limit.middleware.ts`,
-  `http/routes/uploads.route.ts`, `trpc/init.ts`).
+See `docs/notes/architecture-divergences.md` for why this repo diverged from the original
+multi-package spec, and `docs/notes/better-auth.md` for the session-cookie investigation.

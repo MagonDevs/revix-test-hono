@@ -84,13 +84,6 @@ const apiBoundaries = tseslint.config({
       // below. Listed before the general `http` pattern so it wins.
       { type: "http-root", pattern: `${srcDir}/http/app.ts`, mode: "file" },
       { type: "http", pattern: `${srcDir}/http/**`, mode: "file" },
-      { type: "trpc", pattern: `${srcDir}/trpc/**`, mode: "file" },
-      {
-        type: "module-router",
-        pattern: `${srcDir}/modules/*/*.router.ts`,
-        mode: "file",
-        capture: ["module"],
-      },
       {
         type: "module-service",
         pattern: `${srcDir}/modules/*/*.service.ts`,
@@ -161,7 +154,7 @@ const apiBoundaries = tseslint.config({
           { from: "contracts", allow: [] },
           {
             from: "entry",
-            allow: ["http", "http-root", "trpc", "config", "lib", "db", "errors", "contracts"],
+            allow: ["http", "http-root", "config", "lib", "db", "errors", "contracts"],
           },
           // Composition root (architecture §3): the one `http/**` file
           // allowed to construct concrete `db`/`adapters` instances and
@@ -171,7 +164,6 @@ const apiBoundaries = tseslint.config({
             from: "http-root",
             allow: [
               "http",
-              "trpc",
               "module-index",
               "config",
               "lib",
@@ -186,7 +178,6 @@ const apiBoundaries = tseslint.config({
             from: "http",
             allow: [
               "http-root",
-              "trpc",
               "module-index",
               "config",
               "lib",
@@ -194,20 +185,6 @@ const apiBoundaries = tseslint.config({
               "contracts",
               "db-types",
               "ports",
-            ],
-          },
-          {
-            from: "trpc",
-            allow: ["db", "db-types", "module-index", "config", "lib", "errors", "contracts"],
-          },
-          {
-            from: "module-router",
-            allow: [
-              ["module-service", { module: "${from.module}" }],
-              "trpc",
-              "errors",
-              "lib",
-              "contracts",
             ],
           },
           {
@@ -252,7 +229,11 @@ const apiBoundaries = tseslint.config({
           },
           {
             from: "module-internal",
-            allow: ["db", "config", "contracts"],
+            // `errors`: a module internal may classify a failure as an
+            // `AppError` (e.g. auth/auth-error.ts rewriting Better Auth's
+            // native errors). The error domain is transport-free, so this
+            // does not let a module reach the HTTP layer.
+            allow: ["db", "config", "contracts", "errors"],
           },
           {
             from: "module-mapper",
@@ -266,7 +247,6 @@ const apiBoundaries = tseslint.config({
           {
             from: "module-index",
             allow: [
-              ["module-router", { module: "${from.module}" }],
               ["module-service", { module: "${from.module}" }],
               // Modules with no router/service of their own (e.g. `auth`,
               // `meta`) re-export their plain internal files directly.
@@ -284,7 +264,7 @@ const apiBoundaries = tseslint.config({
           // exemption): legitimately constructs adapters, uses ports, and
           // writes through repositories/module internals directly. The
           // reverse direction (anything importing `seed`) stays forbidden —
-          // see `trpc`/`http`/module rules above, none of which allow it.
+          // see the `http`/module rules above, none of which allow it.
           {
             from: "seed",
             allow: [
@@ -317,10 +297,10 @@ const rootConfigFiles = ["eslint.config.js", "commitlint.config.js"];
 // NOTE on `apiBoundaries`: this was initially defined but not wired into the
 // default export (~110 latent violations from the old workspace config, then
 // 33 after the allow-list was corrected to close genuine gaps in the
-// architecture spec — e.g. routers importing trpc/init.ts, mappers using
-// other modules' index.ts, repositories importing db). Those 33 have since
-// been fixed at the source level: `DomainThrow`/`toAppError` moved out of
-// `trpc/unwrap.ts` into `errors/domain-throw.ts` (module-service → trpc);
+// architecture spec — e.g. mappers using other modules' index.ts,
+// repositories importing db). Those 33 have since been fixed at the source
+// level: `DomainThrow`/`toAppError` live in `errors/domain-throw.ts` rather
+// than in the transport layer, so a service never depends on transport;
 // `pets.service.ts` no longer imports Drizzle/adapters directly (the R-6
 // cross-table update moved into `modules/adoption-requests`'s public API,
 // id generation moved to a module-level default implementing `IdPort`);
@@ -330,8 +310,8 @@ const rootConfigFiles = ["eslint.config.js", "commitlint.config.js"];
 // (`seed`) is allowed to import module internals/repositories/ports/
 // adapters/db directly, since it is dev/CLI tooling outside the request
 // path, but nothing may import `seed` back; and the curated breed list
-// moved from `seed/data/breeds.ts` to `modules/meta/`, so `trpc/router.ts`'s
-// `meta.breeds` no longer depends on the seeder. Test files remain excluded
+// moved from `seed/data/breeds.ts` to `modules/meta/`, so the
+// `GET /meta/breeds` route no longer depends on the seeder. Test files remain excluded
 // from boundaries enforcement (they legitimately reach across layers to
 // build fixtures). `apiBoundaries` is now wired into the default export and
 // enforced on every `pnpm lint` run.

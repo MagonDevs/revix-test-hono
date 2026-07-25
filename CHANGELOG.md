@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.2.0 — 2026-07-25
+
+**Breaking: tRPC replaced by a REST API under `/api/v1`.** The only client
+never used tRPC — it ships a `fetch`-based REST client and a matching set
+of mock handlers — so the transport was serving no one. Those mock
+handlers were used as the authoritative spec for paths and verbs, making
+the real API a drop-in replacement for the mock. Rationale in
+`docs/notes/architecture-divergences.md`; the full endpoint table is in
+the README.
+
+- Removed `src/trpc/**`, every `modules/*/​*.router.ts`, and the
+  `@trpc/server` / `@hono/trpc-server` / `superjson` dependencies. The
+  service, repository, domain and mapper layers are untouched.
+- Error bodies changed shape: `{ error: { message, data: { appCode, … } } }`
+  → `{ error: { code, message, requestId, details?, conflictReason?,
+  retryAfterSeconds? } }`. The HTTP status and `code` always agree.
+- `createdAt` / `updatedAt` / `respondedAt` are now RFC 3339 strings.
+  superjson used to carry `Date` across the wire; plain JSON cannot.
+- Procedure inputs were split into path params, query string and body. A
+  resource id is only ever read from the path. Query schemas coerce and
+  accept repeated params (`?species=dog&species=cat`).
+- Better Auth's own routes are no longer exposed. `/api/v1/auth/{register,
+  login,logout,session}` wrap it so the client sees one error envelope and
+  one user shape. `GET /auth/session` answers 401 when anonymous rather
+  than 200 with `null`.
+- `user.id` is now a uuidv7 (Better Auth `advanced.database.generateId`),
+  matching the contract's UUID id type. **Existing user rows keep their
+  old ids** — reseed a development database (`pnpm db:reset`).
+- Uploads moved from `/api/uploads` to `/api/v1/uploads`, including the
+  `url` on every `PetPhoto`.
+- `PATCH /users/me` still takes `avatarUploadId`, not `avatarUrl` — the
+  server ownership-checks the id and resolves the URL itself (R-15). The
+  client needs a one-field change here; noted in the divergences doc.
+
 ## 0.1.1 — 2026-07-25
 
 Fixed: §8.4/R-9 vs §5.4/R-2 contradiction for `adoptionRequests.create` on

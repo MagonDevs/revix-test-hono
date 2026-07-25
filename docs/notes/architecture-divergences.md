@@ -35,12 +35,9 @@ the outward-facing type export were pure overhead, so both were removed.
   `@adopta/contracts` package had by virtue of being a separate package.
 - **The types-only export is gone.** `src/trpc/router.types.ts` (architecture
   §2.2) and the `"exports": { "./trpc": ... }` block in `package.json` were
-  deleted outright. `AppRouter` (`typeof appRouter`) still exists in
-  `src/trpc/router.ts` for internal use (constructing the tRPC server), it
-  just isn't republished as a package entry point anymore, because nothing
-  outside this repo imports it. See the README's "Client integration"
-  section for how the client actually talks to this API now (plain HTTP:
-  tRPC over `POST /trpc/*` with superjson, plus four HTTP routes).
+  deleted outright, because nothing outside this repo imports them. This was
+  the first half of a decision that has since been finished — see
+  "tRPC removed entirely" below.
 - **Docker simplified.** The old `Dockerfile` ran the server via `tsx` at
   runtime specifically because `@adopta/contracts`'s `exports` pointed at
   raw `.ts` that plain `node` couldn't resolve. That constraint is gone —
@@ -59,6 +56,70 @@ the outward-facing type export were pure overhead, so both were removed.
   of `apps/api/src/`.
 - `PUBLIC_ORIGIN` and the proxy expectation (architecture §5.2) are
   unchanged and still critical — see the README.
+
+## tRPC removed entirely, replaced by REST under `/api/v1` (2026-07-25)
+
+Architecture §3 specified tRPC as the transport, with four plain-HTTP
+routes alongside it. tRPC is now gone; the whole surface is REST.
+
+### Why
+
+tRPC's one real payoff is end-to-end type inference through `AppRouter`,
+and it had no consumer. The only client, `adopta-web`, has no
+`@trpc/client` dependency at all: it ships a `fetch`-based API client
+(`src/server/api-client/`) that calls REST paths against `API_BASE_URL`,
+plus a full set of mock handlers under `src/routes/api/v1/*` that already
+pinned the exact verbs and paths. Once the types-only export was dropped
+(above), tRPC was pure cost — a second transport over the same services,
+with its own error formatter, its own procedure builders, and its own
+tests to keep in step. Serving both would have doubled the surface for
+nothing.
+
+The client's existing mock handlers were treated as the authoritative
+spec for paths and verbs, so the real API is a drop-in replacement for
+the mock rather than a new dialect for the client to learn.
+
+### What changed
+
+- `src/trpc/**` and every `modules/*/​*.router.ts` are deleted, replaced by
+  `src/http/routes/*.route.ts`. `@trpc/server`, `@hono/trpc-server` and
+  `superjson` are no longer dependencies.
+- The tRPC pieces have plain-HTTP equivalents rather than disappearing:
+  `unwrap()` → `http/lib/respond.ts`, `.input()` → `http/lib/parse.ts`,
+  `.output()` → `json()`'s schema parse (a handler that drifts from the
+  contract still fails loudly), `errorFormatter` →
+  `http/lib/http-error.ts` + `middleware/error-handler.ts`,
+  `protectedProcedure` → `http/lib/guards.ts`'s `requireUser`, the
+  per-user rate-limit middleware → `middleware/user-rate-limit.middleware.ts`.
+- **Error envelope changed** from `{ error: { message, data: { appCode, … } } }`
+  to `{ error: { code, message, requestId, details?, … } }` — flat, and
+  matching what the client already parses.
+- **Timestamps are ISO strings, not `Date`s.** superjson used to carry
+  `Date` across the wire; plain JSON cannot, so `createdAt`/`updatedAt`/
+  `respondedAt` are RFC 3339 strings in the contracts and the mappers
+  call `.toISOString()`.
+- **Inputs were split** from one tRPC blob into path params + query +
+  body. A resource id is only ever read from the path, so a caller can't
+  address one pet in the URL and another in the payload. Query schemas
+  coerce (everything arrives as a string) and accept repeated params for
+  the multi-select filters.
+- **Auth is wrapped, not passed through.** Better Auth's own routes are no
+  longer exposed; `/api/v1/auth/{register,login,logout,session}` wrap it so
+  the client sees one error envelope and one user shape. `user.id` is now
+  a uuidv7 (`advanced.database.generateId`) so auth-owned rows share the
+  contract's id space.
+- **Uploads moved** from `/api/uploads` to `/api/v1/uploads`, including
+  the `url` on every `PetPhoto`.
+
+### Open follow-up for the client
+
+`PATCH /users/me` takes `avatarUploadId` (an id the server
+ownership-checks and resolves to a URL), while `adopta-web`'s mock accepts
+`avatarUrl`. The API deliberately keeps the id: accepting a URL would let
+any caller point their avatar at an arbitrary string, and R-15 requires
+the ownership check. The client already has the id to hand — it's
+`UploadDto.id` from the upload it just performed — so this is a one-field
+change on its side.
 
 ## `adoptionRequests.create` on an adopted/withdrawn pet: `pet_unavailable` is unreachable (2026-07-25)
 

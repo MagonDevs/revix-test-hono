@@ -1,6 +1,6 @@
 {
   "name": "adopta-api",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "license": "UNLICENSED",
   "type": "module",
@@ -31,8 +31,6 @@
   "dependencies": {
     "@faker-js/faker": "^10.5.0",
     "@hono/node-server": "^1.13.8",
-    "@hono/trpc-server": "^0.4.2",
-    "@trpc/server": "11.18.0",
     "better-auth": "^1.6.25",
     "drizzle-orm": "^0.45.2",
     "file-type": "^22.0.1",
@@ -41,7 +39,6 @@
     "pg": "^8.13.1",
     "pino": "^9.6.0",
     "sharp": "^0.33.5",
-    "superjson": "^2.2.2",
     "uuid": "^11.0.5",
     "zod": "^4.0.0"
   },

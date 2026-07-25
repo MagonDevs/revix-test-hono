@@ -213,6 +213,15 @@ describe("adoptionRequests.service (requires Docker)", () => {
   });
 
   it("R-9: cannot request an adopted or withdrawn pet", async () => {
+    // Contract defect (see CHANGELOG.md and docs/notes/architecture-divergences.md):
+    // §8.4/R-9 says adopted/withdrawn -> conflict/pet_unavailable, but
+    // §5.4/R-2's 404-over-403 rule makes an adopted/withdrawn pet invisible
+    // to a non-owner stranger, so `not_found` fires first in `create()`.
+    // The only caller who *can* see the pet in that state is the owner,
+    // who is already rejected earlier by R-7 (self_request). That makes
+    // `pet_unavailable` unreachable through this path, and the security
+    // rule (don't leak existence of records the caller can't see) wins:
+    // the still-correct, still-desired behavior is `not_found`.
     for (const status of ["adopted", "withdrawn"] as const) {
       await withRollback(testDb.db, async (tx) => {
         const guardianId = uuidv7();
@@ -238,8 +247,7 @@ describe("adoptionRequests.service (requires Docker)", () => {
         });
         expect(result.isErr()).toBe(true);
         if (result.isErr()) {
-          expect(result.error.code).toBe("conflict");
-          if (result.error.code === "conflict") expect(result.error.reason).toBe("pet_unavailable");
+          expect(result.error.code).toBe("not_found");
         }
       });
     }
@@ -333,6 +341,48 @@ describe("adoptionRequests.service (requires Docker)", () => {
       const ids = list.value.items.map((r) => r.id);
       // pending first (C then A, newest createdAt first), declined last.
       expect(ids).toEqual([reqC.value.id, reqA.value.id, reqB.value.id]);
+    });
+  });
+
+  it("pagination: out-of-range page returns [] with correct total/totalPages, not an error", async () => {
+    await withRollback(testDb.db, async (tx) => {
+      const guardianId = uuidv7();
+      const adopterId = uuidv7();
+      await insertUser(tx, {
+        id: guardianId,
+        name: "Ana",
+        email: "ana-pagination@example.com",
+        city: "Madrid",
+      });
+      await insertUser(tx, {
+        id: adopterId,
+        name: "Bea",
+        email: "bea-pagination@example.com",
+        city: "Madrid",
+      });
+
+      // Three requests, so with perPage 10 there is exactly one real page.
+      for (let i = 0; i < 3; i += 1) {
+        const petId = uuidv7();
+        await insertPet(tx, { id: petId, ownerId: guardianId });
+        const created = await service.create(tx as unknown as Database, adopterId, {
+          petId,
+          message: MESSAGE,
+        });
+        expect(created.isOk()).toBe(true);
+      }
+
+      const page = await service.list(tx, guardianId, {
+        role: "guardian",
+        page: 5,
+        perPage: 10,
+      });
+      expect(page.isOk()).toBe(true);
+      if (!page.isOk()) return;
+
+      expect(page.value.items).toEqual([]);
+      expect(page.value.meta.total).toBe(3);
+      expect(page.value.meta.totalPages).toBe(1);
     });
   });
 

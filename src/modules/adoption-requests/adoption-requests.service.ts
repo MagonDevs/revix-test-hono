@@ -1,7 +1,7 @@
 import { ResultAsync } from "neverthrow";
-import { Uuidv7IdAdapter } from "../../adapters/uuidv7.adapter.js";
+import { v7 as uuidv7 } from "uuid";
 import { AppErrors, type AppError } from "../../errors/app-error.js";
-import { DomainThrow, toAppError } from "../../trpc/unwrap.js";
+import { DomainThrow, toAppError } from "../../errors/domain-throw.js";
 import { findVisiblePet, isLegalTransition, setPetStatusInTx } from "../pets/index.js";
 import { mapAdoptionRequest } from "./adoption-requests.mapper.js";
 import * as repo from "./adoption-requests.repository.js";
@@ -14,8 +14,14 @@ import type {
 } from "#contracts";
 import type { AdoptionRequestRow } from "./adoption-requests.mapper.js";
 import type { Database, Executor } from "../../db/types.js";
+import type { IdPort } from "../../ports/id.port.js";
 
-const idPort = new Uuidv7IdAdapter();
+// Architecture §2.1 — service may import own repository/mapper, other
+// modules' `index.ts`, and `ports`, not Drizzle or `adapters`. `idPort` is a
+// module-level default (see `modules/pets/pets.service.ts` for the same
+// pattern) rather than `new Uuidv7IdAdapter()`, so this file never imports
+// `src/adapters`.
+const idPort: IdPort = { next: () => uuidv7() };
 
 // Architecture §2.1 — service may import own repository/mapper and other
 // modules' `index.ts`, not Drizzle. Returns `ResultAsync<T, AppError>`.
@@ -67,6 +73,19 @@ export function create(
         );
       }
 
+      // NOTE: this branch is currently unreachable. `findVisiblePet` above
+      // already applies R-2's visibility predicate (available/reserved OR
+      // owner), so an adopted/withdrawn pet only reaches this line for its
+      // owner — and the owner was already rejected above by the
+      // self_request check (R-7). Every other caller hits `not_found`
+      // before getting here. This is intentional: contract §5.4/R-2's
+      // 404-over-403 rule explicitly names "a withdrawn or adopted pet
+      // requested by a stranger" as a not_found case, and that security
+      // property (don't leak the existence/state of an invisible record)
+      // outranks §8.4's R-9 table entry, which is unreachable as written.
+      // Left in place, not deleted, in case visibility rules ever change
+      // and make it reachable. See CHANGELOG.md and
+      // docs/notes/architecture-divergences.md.
       if (pet.status === "adopted" || pet.status === "withdrawn") {
         throw new DomainThrow(AppErrors.conflict("pet_unavailable", "This pet is not available"));
       }

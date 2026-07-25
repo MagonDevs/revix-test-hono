@@ -1,12 +1,12 @@
-import { protectedProcedure, router } from "../../trpc/init.js";
-import { unwrap } from "../../trpc/unwrap.js";
-import * as service from "./favourites.service.js";
 import {
   favouritesListInputSchema,
   favouritesListOutputSchema,
   favouritesSetInputSchema,
   favouritesSetOutputSchema,
 } from "#contracts";
+import { protectedProcedure, router } from "../../trpc/init.js";
+import { unwrap } from "../../trpc/unwrap.js";
+import * as service from "./favourites.service.js";
 
 // Contract §8.5 — router -> service -> unwrap (architecture §2.1). Both
 // procedures are protected: favourites are per-user, no anonymous view.

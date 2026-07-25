@@ -1,3 +1,5 @@
+import "./config/load-env.js";
+
 import { serve } from "@hono/node-server";
 import { env } from "./config/env.js";
 import { db, closeDb } from "./db/client.js";

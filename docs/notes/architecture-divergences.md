@@ -59,3 +59,52 @@ the outward-facing type export were pure overhead, so both were removed.
   of `apps/api/src/`.
 - `PUBLIC_ORIGIN` and the proxy expectation (architecture §5.2) are
   unchanged and still critical — see the README.
+
+## `adoptionRequests.create` on an adopted/withdrawn pet: `pet_unavailable` is unreachable (2026-07-25)
+
+The contract contradicts itself for requesting an `adopted`/`withdrawn`
+pet, and the implementation resolves the contradiction in favor of the
+security rule rather than the convenience rule. Recorded here per the spec
+README's governance rule ("if the contract as written is unimplementable
+or wrong, do not quietly diverge — change the contract document and the
+package, note it in the changelog, and flag it"); see `CHANGELOG.md` 0.1.1
+for the changelog entry.
+
+### Why
+
+- `01-api-contract.md` §8.4, rule R-9: `adoptionRequests.create` on a pet
+  whose status is `adopted` or `withdrawn` should return
+  `conflict`/`pet_unavailable`.
+- `01-api-contract.md` §5.4 (the 404-over-403 rule) and rule R-2: a
+  resource that exists but is not visible to the caller returns
+  `not_found`, not a status that would confirm its existence. §5.4
+  explicitly names "a `withdrawn` or `adopted` pet requested by a
+  stranger" as a `not_found` case, framed as a security property (avoid
+  leaking the existence/state of a record the caller shouldn't see), not a
+  convenience.
+- These two rules target the same request. Standard visibility (used
+  everywhere else, `src/modules/pets/pets.repository.ts`'s
+  `visibilityPredicate`: `available`/`reserved`, OR the pet's own owner)
+  means an `adopted`/`withdrawn` pet is invisible to every caller except
+  its owner. `adoptionRequests.create`
+  (`src/modules/adoption-requests/adoption-requests.service.ts`) already
+  rejects the owner earlier, via R-7's `self_request` check. So by the
+  time the R-9 status check would run, every possible caller has already
+  either been turned away as `not_found` (stranger, pet invisible) or
+  `conflict`/`self_request` (owner). The `pet_unavailable` branch is dead
+  code as specified — no test can legitimately reach it without first
+  weakening visibility, which would itself violate R-2/§5.4.
+
+### Resolution
+
+The security rule wins. `not_found` is kept as the actual behavior for a
+stranger requesting an adopted/withdrawn pet; §5.4/R-2 stands as written.
+`ConflictReason.pet_unavailable` (`src/contracts/errors.ts`) is **not**
+removed — deleting an enum member is a breaking contract change, and the
+branch could become reachable again if visibility rules ever change (e.g.
+a future "recently adopted, visible to past inquirers" feature) — but it
+is now documented as currently unreachable at its enum declaration and at
+the dead branch in `adoption-requests.service.ts`. The integration test
+`R-9: cannot request an adopted or withdrawn pet`
+(`src/modules/adoption-requests/adoption-requests.service.integration.test.ts`)
+was updated to assert `not_found` instead of `conflict`/`pet_unavailable`.

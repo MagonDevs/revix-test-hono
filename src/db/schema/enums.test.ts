@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { petSizeEnum, petStatusEnum, requestStatusEnum, sexEnum, speciesEnum } from "./enums.js";
 import {
   ageGroupSchema,
   petSizeSchema,
@@ -10,6 +9,7 @@ import {
   sexSchema,
   speciesSchema,
 } from "#contracts";
+import { petSizeEnum, petStatusEnum, requestStatusEnum, sexEnum, speciesEnum } from "./enums.js";
 
 // Data model §2: "A contract test asserts speciesEnum.enumValues equals
 // speciesSchema.options, for every enum." This is what makes drift

@@ -179,10 +179,16 @@ describe("favourites.service (requires Docker)", () => {
         email: "bea5@example.com",
         city: "Madrid",
       });
-      await insertPet(tx, { id: petId, ownerId, status: "adopted" });
+      // Favourite the pet while it is still visible (available) — a
+      // stranger cannot favourite a pet that is already adopted/withdrawn
+      // (R-2, contract §5.4). The point of this test is what happens
+      // *after* the favourite exists and the pet later transitions.
+      await insertPet(tx, { id: petId, ownerId, status: "available" });
 
       const setResult = await service.set(tx, callerId, petId, true);
       expect(setResult.isOk()).toBe(true);
+
+      await tx.update(pets).set({ status: "adopted" }).where(eq(pets.id, petId));
 
       const list = await service.list(tx, callerId, 1, 20);
       expect(list.isOk()).toBe(true);
@@ -190,6 +196,36 @@ describe("favourites.service (requires Docker)", () => {
         const found = list.value.items.find((p) => p.id === petId);
         expect(found?.status).toBe("adopted");
       }
+    });
+  });
+
+  it("pagination: out-of-range page returns [] with correct total/totalPages, not an error", async () => {
+    await withRollback(testDb.db, async (tx) => {
+      const ownerId = uuidv7();
+      const callerId = uuidv7();
+      await insertUser(tx, { id: ownerId, name: "Ana", email: "ana7@example.com", city: "Madrid" });
+      await insertUser(tx, {
+        id: callerId,
+        name: "Bea",
+        email: "bea7@example.com",
+        city: "Madrid",
+      });
+
+      // Three favourites, so with perPage 10 there is exactly one real page.
+      for (let i = 0; i < 3; i += 1) {
+        const petId = uuidv7();
+        await insertPet(tx, { id: petId, ownerId });
+        const setResult = await service.set(tx, callerId, petId, true);
+        expect(setResult.isOk()).toBe(true);
+      }
+
+      const page = await service.list(tx, callerId, 5, 10);
+      expect(page.isOk()).toBe(true);
+      if (!page.isOk()) return;
+
+      expect(page.value.items).toEqual([]);
+      expect(page.value.meta.total).toBe(3);
+      expect(page.value.meta.totalPages).toBe(1);
     });
   });
 

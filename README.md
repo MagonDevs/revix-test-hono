@@ -38,6 +38,15 @@ pnpm dev                         # tsx watch src/index.ts
 The server listens on `PORT` (default `8787`). Health checks: `GET /health`,
 `GET /ready`.
 
+`.env` is loaded automatically — `src/config/load-env.ts` (a thin wrapper
+around `dotenv`) is imported as the first statement of every entry point
+(`src/index.ts`, `src/db/migrate.ts`, `src/seed/index.ts`,
+`src/scripts/sweep-uploads.ts`), before `src/config/env.ts` parses
+`process.env`. Real environment variables (shell exports, Docker, CI/prod)
+always take precedence over `.env` values, and a missing `.env` file is a
+silent no-op — so this has no effect in production or Docker, where config
+comes from real env vars.
+
 ## Scripts (`package.json`)
 
 | Script             | What it does                                                                                                                                                             |

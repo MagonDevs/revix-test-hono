@@ -1,21 +1,28 @@
 import { Hono } from "hono";
-import { LocalStorageAdapter } from "../../adapters/local-storage.adapter.js";
-import { SharpImageAdapter } from "../../adapters/sharp.adapter.js";
-import { env } from "../../config/env.js";
-import { db } from "../../db/client.js";
+import { LIMITS } from "#contracts";
 import { AppErrors } from "../../errors/app-error.js";
-import { auth } from "../../modules/auth/auth.config.js";
+import { auth } from "../../modules/auth/index.js";
 import { createUpload, getUploadBytes } from "../../modules/uploads/index.js";
 import { toHttpErrorBody } from "../lib/http-error.js";
+import type { Database } from "../../db/types.js";
+import type { ImagePort } from "../../ports/image.port.js";
+import type { StoragePort } from "../../ports/storage.port.js";
 import type { AppVariables } from "../app.js";
-import { LIMITS } from "#contracts";
 
 // Contract §7.4-7.5 — plain HTTP, not tRPC. Architecture §7's pipeline:
 // authenticate -> rate limit -> size guard -> sniff -> sharp normalise
 // -> StoragePort.put -> insert -> Upload shape.
+//
+// `db`/`storage`/`image` are injected rather than constructed here — an
+// ordinary route file must not import `db` or `adapters` directly
+// (architecture §2.1); the composition root (`http/app.ts`) builds the
+// concrete instances and passes them in.
 
-const storage = new LocalStorageAdapter(env.STORAGE_LOCAL_DIR);
-const image = new SharpImageAdapter();
+export interface UploadsRoutesDeps {
+  db: Database;
+  storage: StoragePort;
+  image: ImagePort;
+}
 
 // Per-user 30/hour limiter (contract §7.4). The existing
 // `rate-limit.middleware.ts` is IP-keyed only and runs before auth is
@@ -41,7 +48,8 @@ function checkUploadRateLimit(userId: string): number | null {
   return null;
 }
 
-export function createUploadsRoutes() {
+export function createUploadsRoutes(deps: UploadsRoutesDeps) {
+  const { db, storage, image } = deps;
   const app = new Hono<{ Variables: AppVariables }>();
 
   app.post("/api/uploads", async (c) => {

@@ -1,6 +1,3 @@
-import { protectedProcedure, rateLimitedProtectedProcedure, router } from "../../trpc/init.js";
-import { unwrap } from "../../trpc/unwrap.js";
-import * as service from "./adoption-requests.service.js";
 import {
   adoptionRequestSchema,
   adoptionRequestsByIdInputSchema,
@@ -10,6 +7,9 @@ import {
   adoptionRequestsRespondInputSchema,
   adoptionRequestsWithdrawInputSchema,
 } from "#contracts";
+import { protectedProcedure, rateLimitedProtectedProcedure, router } from "../../trpc/init.js";
+import { unwrap } from "../../trpc/unwrap.js";
+import * as service from "./adoption-requests.service.js";
 
 // Contract §8.4 — router -> service -> unwrap (architecture §2.1). All
 // five procedures are protected: there is no anonymous view of a request.

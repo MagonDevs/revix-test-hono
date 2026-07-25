@@ -2,6 +2,8 @@ import { trpcServer } from "@hono/trpc-server";
 import { Hono, type Context as HonoContext } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
+import { LocalStorageAdapter } from "../adapters/local-storage.adapter.js";
+import { SharpImageAdapter } from "../adapters/sharp.adapter.js";
 import { env } from "../config/env.js";
 import { db } from "../db/client.js";
 import { createContext } from "../trpc/context.js";
@@ -18,6 +20,11 @@ import type { Logger } from "../lib/logger.js";
 // Architecture §3 — Hono composition. Middleware order is load-bearing:
 // request id before logging, CORS before the auth handler, rate limit
 // before the handler it protects.
+//
+// This file is the composition root for `http/**` (architecture §2.1): the
+// one place under `http/` allowed to construct concrete `db`/adapter
+// instances and wire them into route factories — ordinary route files
+// receive them by injection instead.
 
 export interface AppVariables {
   requestId: string;
@@ -41,7 +48,14 @@ export function createApp() {
   app.route("/", createAuthRoutes());
 
   // Uploads (B6): contract §7.4-7.5, plain HTTP not tRPC.
-  app.route("/", createUploadsRoutes());
+  app.route(
+    "/",
+    createUploadsRoutes({
+      db,
+      storage: new LocalStorageAdapter(env.STORAGE_LOCAL_DIR),
+      image: new SharpImageAdapter(),
+    }),
+  );
 
   // `Cache-Control: private, no-store` on every /trpc response (contract
   // §2). Set before the trpcServer middleware runs so it applies

@@ -192,6 +192,7 @@ export async function listPaginated(
   ];
   if (filters.status) conditions.push(eq(adoptionRequests.status, filters.status));
   if (filters.petId) conditions.push(eq(adoptionRequests.petId, filters.petId));
+  const where = and(...conditions) as SQL;
 
   const rows = await db
     .select({
@@ -215,7 +216,7 @@ export async function listPaginated(
       guardianUser as unknown as typeof user,
       eq(adoptionRequests.guardianId, guardianUser.id),
     )
-    .where(and(...conditions))
+    .where(where)
     .orderBy(
       sql`(${adoptionRequests.status} = 'pending') desc`,
       desc(adoptionRequests.createdAt),
@@ -224,9 +225,41 @@ export async function listPaginated(
     .limit(filters.perPage)
     .offset((filters.page - 1) * filters.perPage);
 
-  const total = rows[0]?.total ?? 0;
+  const total = rows.length > 0 ? (rows[0]?.total ?? 0) : await countAdoptionRequests(db, where);
   const items = rows.map(({ total: _total, ...rest }) => rest);
   return { items, total };
+}
+
+/**
+ * Exact count matching an adoption-requests WHERE predicate. No joins to
+ * `pets`/`user` — those exist in the page query only to hydrate row
+ * fields, and joining them here would risk multiplying rows if any join
+ * were ever one-to-many.
+ */
+async function countAdoptionRequests(db: Executor, where: SQL): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)`.mapWith(Number) })
+    .from(adoptionRequests)
+    .where(where);
+  return row?.count ?? 0;
+}
+
+/**
+ * R-6: called by `modules/pets`'s `setStatus` (via this module's
+ * `index.ts`, architecture §6.1) inside the same transaction that marks
+ * the pet `adopted`, so the two writes stay atomic. Declines every
+ * `pending` request for the pet — `accepted`/`declined`/`withdrawn` rows
+ * are left untouched.
+ */
+export async function declinePendingForPet(
+  db: Executor,
+  petId: string,
+  respondedAt: Date,
+): Promise<void> {
+  await db
+    .update(adoptionRequests)
+    .set({ status: "declined", respondedAt })
+    .where(and(eq(adoptionRequests.petId, petId), eq(adoptionRequests.status, "pending")));
 }
 
 /** Cover photos (position 0) for a page of requests' pets, keyed by `pet_id`. */

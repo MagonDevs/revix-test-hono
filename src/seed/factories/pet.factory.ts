@@ -1,7 +1,14 @@
-import { breedFor } from "../data/breeds.js";
+import { BREEDS_BY_SPECIES } from "../../modules/meta/index.js";
 import { composeDescription } from "../data/descriptions.js";
 import { nameFor } from "../data/names.js";
+import { at } from "../util.js";
 import type { PetSize, PetStatus, Sex, Species } from "#contracts";
+
+/** Deterministic per-species breed pick, mirroring `meta.breeds`' source data. */
+function breedFor(species: Species, index: number): string {
+  const list = BREEDS_BY_SPECIES[species];
+  return at(list, index % list.length, "breed list");
+}
 
 // Direct-insert row shape for `pets` (db/schema/pets.ts). Unlike users,
 // pets/requests/favourites ARE fine as direct inserts — spec §2 only

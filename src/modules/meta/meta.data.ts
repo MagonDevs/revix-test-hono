@@ -1,10 +1,12 @@
-import { at } from "../util.js";
 import type { Species } from "#contracts";
 
-// Spec §3 — curated per-species breeds. Also backs `meta.breeds`
-// (src/trpc/router.ts), replacing the B2/B3 four-entry stub.
-// `pet.breed` still accepts any free-text string within LIMITS.pet.breedMax
-// — this list is a suggestion source, not an enum.
+// Curated per-species suggestion list for a free-text combobox (contract
+// §8.6). Not authoritative — `pet.breed` accepts any string within its
+// length limit. Backs both `meta.breeds` (trpc/router.ts) and the seeder's
+// pet factory, so seeded pets and this endpoint never drift apart (B4).
+// Previously lived under `src/seed/data/breeds.ts`; moved here because
+// production request-handling code (`meta.breeds`) must not depend on the
+// seeder (architecture §2.1).
 
 export const BREEDS_BY_SPECIES: Record<Species, string[]> = {
   dog: [
@@ -55,8 +57,3 @@ export const BREEDS_BY_SPECIES: Record<Species, string[]> = {
   ],
   other: ["Guinea Pig", "Hamster", "Ferret", "Tortoise", "Mixed Breed"],
 };
-
-export function breedFor(species: Species, index: number): string {
-  const list = BREEDS_BY_SPECIES[species];
-  return at(list, index % list.length, "breed list");
-}

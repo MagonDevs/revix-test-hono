@@ -1,6 +1,6 @@
 import { ResultAsync } from "neverthrow";
 import { AppErrors, type AppError } from "../../errors/app-error.js";
-import { DomainThrow, toAppError } from "../../trpc/unwrap.js";
+import { DomainThrow, toAppError } from "../../errors/domain-throw.js";
 import { findPhotosByPetIds, findVisiblePet, mapPet } from "../pets/index.js";
 import * as repo from "./favourites.repository.js";
 import type { FavouritesSetOutput, Pet, PaginationMeta } from "#contracts";

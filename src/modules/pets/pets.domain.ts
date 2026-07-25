@@ -1,5 +1,5 @@
-import type { AgeGroup, PetStatus } from "#contracts";
 import { AGE_GROUP_MONTHS } from "#contracts";
+import type { AgeGroup, PetStatus } from "#contracts";
 
 // Architecture §2.1 — domain may import nothing from the app. Pure
 // business rules only: no I/O, no Drizzle, no contracts-derived schemas

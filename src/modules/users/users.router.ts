@@ -1,12 +1,12 @@
-import { protectedProcedure, publicProcedure, router } from "../../trpc/init.js";
-import { unwrap } from "../../trpc/unwrap.js";
-import * as service from "./users.service.js";
 import {
   sessionUserSchema,
   userProfileSchema,
   usersByIdInputSchema,
   usersUpdateMeInputSchema,
 } from "#contracts";
+import { protectedProcedure, publicProcedure, router } from "../../trpc/init.js";
+import { unwrap } from "../../trpc/unwrap.js";
+import * as service from "./users.service.js";
 
 // Contract §8.2 — router -> service -> repository (architecture §6).
 

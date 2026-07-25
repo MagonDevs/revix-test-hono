@@ -1,3 +1,5 @@
+import "../config/load-env.js";
+
 import { LocalStorageAdapter } from "../adapters/local-storage.adapter.js";
 import { env } from "../config/env.js";
 import { closeDb, db } from "../db/client.js";

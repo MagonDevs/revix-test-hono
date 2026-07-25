@@ -1,9 +1,9 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { LIMITS } from "#contracts";
 import { env } from "../../config/env.js";
 import { db } from "../../db/client.js";
 import * as authSchema from "../../db/schema/auth.js";
-import { LIMITS } from "#contracts";
 
 // Architecture §5.1. B3: wired to the parsed `env` (config/env.ts) instead
 // of reading `process.env` directly, so a missing/invalid var fails boot

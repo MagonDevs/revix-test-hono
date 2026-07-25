@@ -62,7 +62,14 @@ export function mapPet(row: PetRow, photos: PetPhotoRow[], viewerFlags: ViewerFl
     sex: row.sex,
     ageMonths: row.ageMonths,
     size: row.size,
-    weightKg: row.weightGrams !== null ? row.weightGrams / 1000 : null,
+    // Defensive rounding: the contract validates weightKg to one decimal
+    // place on input (`.multipleOf(0.1)`), but nothing enforces that on
+    // the stored gram value. Round here so a stray non-multiple-of-100
+    // gram value in the DB can never produce a contract-violating
+    // response (e.g. a client that round-trips a fetched pet back
+    // through pets.update would fail validation on a field it never
+    // touched).
+    weightKg: row.weightGrams !== null ? Math.round(row.weightGrams / 100) / 10 : null,
     description: row.description,
     photos: photos.map(mapPetPhoto),
     city: row.city,

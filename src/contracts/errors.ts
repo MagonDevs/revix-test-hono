@@ -19,6 +19,14 @@ export const conflictReasonSchema = z.enum([
   "duplicate_email",
   "self_request",
   "duplicate_request",
+  // Currently unreachable via adoptionRequests.create: §5.4/R-2's
+  // 404-over-403 rule makes an adopted/withdrawn pet invisible to any
+  // caller except its owner, and the owner is already rejected earlier by
+  // R-7 (self_request), so the `pet_unavailable` branch in
+  // adoption-requests.service.ts never executes. Kept in the enum (not a
+  // breaking removal) in case visibility rules ever change and it becomes
+  // reachable again. See CHANGELOG.md and
+  // docs/notes/architecture-divergences.md for the full writeup.
   "pet_unavailable",
   "invalid_transition",
   "request_already_answered",

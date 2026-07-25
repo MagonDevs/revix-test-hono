@@ -1,6 +1,5 @@
 import { Hono } from "hono";
-import { normaliseBetterAuthError } from "../../modules/auth/auth-error.js";
-import { auth } from "../../modules/auth/auth.config.js";
+import { auth, normaliseBetterAuthError } from "../../modules/auth/index.js";
 import type { AppVariables } from "../app.js";
 
 // Architecture §5 / contract §7.1-7.3 — mounts Better Auth's own handler

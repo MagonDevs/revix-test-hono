@@ -79,6 +79,10 @@ const apiBoundaries = tseslint.config({
     "boundaries/include": [`${srcDir}/**/*.ts`],
     "boundaries/elements": [
       { type: "contracts", pattern: `${srcDir}/contracts/**`, mode: "file" },
+      // Composition root: the one `http/**` file allowed to wire concrete
+      // dependencies (db, adapters) together, same rationale as `entry`
+      // below. Listed before the general `http` pattern so it wins.
+      { type: "http-root", pattern: `${srcDir}/http/app.ts`, mode: "file" },
       { type: "http", pattern: `${srcDir}/http/**`, mode: "file" },
       { type: "trpc", pattern: `${srcDir}/trpc/**`, mode: "file" },
       {
@@ -129,6 +133,13 @@ const apiBoundaries = tseslint.config({
         mode: "file",
         capture: ["module"],
       },
+      // `db/types.ts` is the `Database`/`Executor`/`Transaction` type-only
+      // surface services legitimately need to own their transaction
+      // boundary (architecture §2.1) — split out from the general `db`
+      // type (Drizzle schema/client, query building) so services can
+      // depend on the former without gaining access to the latter. Listed
+      // before the general `db` pattern so it wins.
+      { type: "db-types", pattern: `${srcDir}/db/types.ts`, mode: "file" },
       { type: "db", pattern: `${srcDir}/db/**`, mode: "file" },
       { type: "ports", pattern: `${srcDir}/ports/**`, mode: "file" },
       { type: "adapters", pattern: `${srcDir}/adapters/**`, mode: "file" },
@@ -150,16 +161,54 @@ const apiBoundaries = tseslint.config({
           { from: "contracts", allow: [] },
           {
             from: "entry",
-            allow: ["http", "trpc", "config", "lib", "db", "errors", "contracts"],
+            allow: ["http", "http-root", "trpc", "config", "lib", "db", "errors", "contracts"],
           },
-          { from: "http", allow: ["trpc", "module-index", "config", "lib", "errors", "contracts"] },
+          // Composition root (architecture §3): the one `http/**` file
+          // allowed to construct concrete `db`/`adapters` instances and
+          // pass them down. Ordinary route files receive them by injection
+          // instead (see `http` below).
+          {
+            from: "http-root",
+            allow: [
+              "http",
+              "trpc",
+              "module-index",
+              "config",
+              "lib",
+              "errors",
+              "contracts",
+              "db",
+              "db-types",
+              "adapters",
+            ],
+          },
+          {
+            from: "http",
+            allow: [
+              "http-root",
+              "trpc",
+              "module-index",
+              "config",
+              "lib",
+              "errors",
+              "contracts",
+              "db-types",
+              "ports",
+            ],
+          },
           {
             from: "trpc",
-            allow: ["module-index", "config", "lib", "errors", "contracts"],
+            allow: ["db", "db-types", "module-index", "config", "lib", "errors", "contracts"],
           },
           {
             from: "module-router",
-            allow: [["module-service", { module: "${from.module}" }], "errors", "lib", "contracts"],
+            allow: [
+              ["module-service", { module: "${from.module}" }],
+              "trpc",
+              "errors",
+              "lib",
+              "contracts",
+            ],
           },
           {
             from: "module-service",
@@ -174,13 +223,20 @@ const apiBoundaries = tseslint.config({
               "errors",
               "lib",
               "contracts",
+              // Type-only Database/Executor/Transaction surface — services
+              // own their transaction boundary (architecture §6) but must
+              // not import Drizzle itself.
+              "db-types",
             ],
           },
           {
             from: "module-repository",
             allow: [
               "db",
+              "db-types",
               ["module-domain", { module: "${from.module}" }],
+              ["module-mapper", { module: "${from.module}" }],
+              ["module-index", { module: "!${from.module}" }],
               "errors",
               "lib",
               "contracts",
@@ -190,25 +246,60 @@ const apiBoundaries = tseslint.config({
             from: "module-policy",
             allow: [["module-domain", { module: "${from.module}" }], "contracts"],
           },
-          { from: "module-domain", allow: ["contracts"] },
+          {
+            from: "module-domain",
+            allow: ["contracts"],
+          },
+          {
+            from: "module-internal",
+            allow: ["db", "config", "contracts"],
+          },
           {
             from: "module-mapper",
-            allow: [["module-domain", { module: "${from.module}" }], "errors", "contracts"],
+            allow: [
+              ["module-domain", { module: "${from.module}" }],
+              ["module-index", { module: "!${from.module}" }],
+              "errors",
+              "contracts",
+            ],
           },
           {
             from: "module-index",
             allow: [
               ["module-router", { module: "${from.module}" }],
               ["module-service", { module: "${from.module}" }],
+              // Modules with no router/service of their own (e.g. `auth`,
+              // `meta`) re-export their plain internal files directly.
+              ["module-internal", { module: "${from.module}" }],
             ],
           },
-          { from: "db", allow: ["lib"] },
+          { from: "db-types", allow: ["db"] },
+          { from: "db", allow: ["db-types", "config", "lib"] },
           { from: "adapters", allow: ["ports", "config", "lib"] },
           { from: "ports", allow: [] },
           { from: "config", allow: [] },
           { from: "lib", allow: ["config"] },
-          { from: "errors", allow: [] },
-          { from: "seed", allow: ["module-index", "db", "lib", "config", "contracts"] },
+          { from: "errors", allow: ["contracts"] },
+          // Dev/CLI tool outside the request path (architecture §2.1's
+          // exemption): legitimately constructs adapters, uses ports, and
+          // writes through repositories/module internals directly. The
+          // reverse direction (anything importing `seed`) stays forbidden —
+          // see `trpc`/`http`/module rules above, none of which allow it.
+          {
+            from: "seed",
+            allow: [
+              "module-index",
+              "module-internal",
+              "module-repository",
+              "ports",
+              "adapters",
+              "db",
+              "db-types",
+              "lib",
+              "config",
+              "contracts",
+            ],
+          },
         ],
       },
     ],
@@ -223,24 +314,29 @@ const apiBoundaries = tseslint.config({
 // (outside any tsconfig program, and not worth a separate untyped pass).
 const rootConfigFiles = ["eslint.config.js", "commitlint.config.js"];
 
-// NOTE on `apiBoundaries`: this refactor discovered (by wiring it in and
-// running `pnpm lint`) that the previous workspace's `apps/api/eslint.config.js`
-// imported only `base` from `@adopta/eslint-config`, never `apiBoundaries()` —
-// so the boundaries/layer rules from architecture §2.1 were defined but never
-// actually enforced by `pnpm lint` in the repo this was refactored from. The
-// real `src/` code has ~110 latent violations of the literal rule set (e.g.
-// module-router/module-service importing `trpc/unwrap.ts` and `trpc/init.ts`
-// directly, seed reaching into a module's repository instead of its
-// `index.ts`) that predate this refactor and are not introduced by it. Fixing
-// all of that is a real architecture cleanup, not an import-path mechanical
-// change, and out of scope for a "no behavior change" structural refactor —
-// so, matching the prior repo's actual (if accidental) behavior, `apiBoundaries`
-// is defined and exported here but not wired into the default lint run below.
-// It was verified to work correctly as a mechanism (see the PR/commit
-// description): temporarily added to `export default`, confirmed it fails on
-// both the pre-existing violations and a freshly-injected one (a service
-// importing `drizzle-orm` directly), then reverted to this state.
+// NOTE on `apiBoundaries`: this was initially defined but not wired into the
+// default export (~110 latent violations from the old workspace config, then
+// 33 after the allow-list was corrected to close genuine gaps in the
+// architecture spec — e.g. routers importing trpc/init.ts, mappers using
+// other modules' index.ts, repositories importing db). Those 33 have since
+// been fixed at the source level: `DomainThrow`/`toAppError` moved out of
+// `trpc/unwrap.ts` into `errors/domain-throw.ts` (module-service → trpc);
+// `pets.service.ts` no longer imports Drizzle/adapters directly (the R-6
+// cross-table update moved into `modules/adoption-requests`'s public API,
+// id generation moved to a module-level default implementing `IdPort`);
+// `http/routes/*` reach modules through their `index.ts` and receive
+// db/adapters by injection from the composition root (`http/app.ts`, now
+// its own `http-root` element type — same idea as `entry`); the seeder
+// (`seed`) is allowed to import module internals/repositories/ports/
+// adapters/db directly, since it is dev/CLI tooling outside the request
+// path, but nothing may import `seed` back; and the curated breed list
+// moved from `seed/data/breeds.ts` to `modules/meta/`, so `trpc/router.ts`'s
+// `meta.breeds` no longer depends on the seeder. Test files remain excluded
+// from boundaries enforcement (they legitimately reach across layers to
+// build fixtures). `apiBoundaries` is now wired into the default export and
+// enforced on every `pnpm lint` run.
 export default [
+  ...apiBoundaries,
   {
     ignores: [
       "dist/**",
@@ -254,6 +350,15 @@ export default [
   },
   ...plain.map((c) => ({ ...c, files: rootConfigFiles })),
   ...base.map((c) => ({ ...c, files: ["src/**/*.ts"] })),
+  // Disable boundaries enforcement for test files (they legitimately reach
+  // across layers to build fixtures).
+  {
+    files: ["src/**/*.test.ts", "src/**/*.integration.test.ts"],
+    rules: {
+      "boundaries/element-types": "off",
+      "boundaries/no-unknown": "off",
+    },
+  },
   {
     files: ["src/**/*.ts"],
     languageOptions: {

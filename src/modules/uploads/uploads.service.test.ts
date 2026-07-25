@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { checkSize, isAllowedMime, sniffMime } from "./uploads.service.js";
 import { LIMITS } from "#contracts";
+import { checkSize, isAllowedMime, sniffMime } from "./uploads.service.js";
 
 // Pure/no-DB pieces of the upload pipeline (architecture §7 steps 3-4).
 // No Docker required.

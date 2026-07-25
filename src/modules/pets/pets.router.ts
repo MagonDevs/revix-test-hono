@@ -1,6 +1,3 @@
-import { protectedProcedure, publicProcedure, router } from "../../trpc/init.js";
-import { unwrap } from "../../trpc/unwrap.js";
-import * as service from "./pets.service.js";
 import {
   petsByIdInputSchema,
   petsCreateInputSchema,
@@ -16,6 +13,9 @@ import {
   petsUpdateInputSchema,
   petSchema,
 } from "#contracts";
+import { protectedProcedure, publicProcedure, router } from "../../trpc/init.js";
+import { unwrap } from "../../trpc/unwrap.js";
+import * as service from "./pets.service.js";
 
 // Contract §8.3 — router -> service -> unwrap (architecture §2.1). No
 // logic beyond input -> service -> unwrap.

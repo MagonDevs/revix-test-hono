@@ -1,6 +1,6 @@
 import { db } from "../db/client.js";
 import { createRequestLogger } from "../lib/logger.js";
-import { auth } from "../modules/auth/auth.config.js";
+import { auth } from "../modules/auth/index.js";
 import { countAvailablePets, findUserById, mapSessionUser } from "../modules/users/index.js";
 import type { SessionUser } from "#contracts";
 import type { Database } from "../db/types.js";

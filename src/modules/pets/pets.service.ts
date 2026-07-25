@@ -1,9 +1,8 @@
-import { and, eq } from "drizzle-orm";
 import { ResultAsync } from "neverthrow";
-import { Uuidv7IdAdapter } from "../../adapters/uuidv7.adapter.js";
-import { adoptionRequests } from "../../db/schema/adoption-requests.js";
+import { v7 as uuidv7 } from "uuid";
 import { AppErrors, type AppError } from "../../errors/app-error.js";
-import { DomainThrow, toAppError } from "../../trpc/unwrap.js";
+import { DomainThrow, toAppError } from "../../errors/domain-throw.js";
+import { declinePendingRequestsForPet } from "../adoption-requests/index.js";
 import { consumeUploads, verifyOwnedUnconsumed } from "../uploads/index.js";
 import { isLegalTransition } from "./pets.domain.js";
 import { mapOwnedPet, mapPet } from "./pets.mapper.js";
@@ -22,12 +21,15 @@ import type {
 } from "#contracts";
 import type { PetPhotoRow } from "./pets.mapper.js";
 import type { Database, Executor } from "../../db/types.js";
+import type { IdPort } from "../../ports/id.port.js";
 
-const idPort = new Uuidv7IdAdapter();
-
-// Architecture §2.1 — service may import own repository/mapper/domain
-// and other modules' `index.ts`, not Drizzle. Returns
-// `ResultAsync<T, AppError>`.
+// Architecture §2.1 — service may import own repository/mapper/domain,
+// other modules' `index.ts`, and `ports`, not Drizzle or `adapters`. Returns
+// `ResultAsync<T, AppError>`. `idPort` is a module-level default rather than
+// a `new Uuidv7IdAdapter()` construction, so this file never imports
+// `src/adapters` — it's the same concrete generator, just not reached
+// through the adapters layer, which the transport/composition root owns.
+const idPort: IdPort = { next: () => uuidv7() };
 
 class PetNotFound extends Error {}
 
@@ -344,12 +346,7 @@ export function setStatus(
         if (!updated) throw new DomainThrow(AppErrors.notFound("Pet"));
 
         if (input.status === "adopted" && input.declinePendingRequests) {
-          await tx
-            .update(adoptionRequests)
-            .set({ status: "declined", respondedAt: now })
-            .where(
-              and(eq(adoptionRequests.petId, input.petId), eq(adoptionRequests.status, "pending")),
-            );
+          await declinePendingRequestsForPet(tx, input.petId, now);
         }
 
         const found = await repo.findById(tx, input.petId, callerId);

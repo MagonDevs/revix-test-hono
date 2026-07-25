@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql, type SQL } from "drizzle-orm";
 import { user } from "../../db/schema/auth.js";
 import { favourites } from "../../db/schema/favourites.js";
 import { pets } from "../../db/schema/pets.js";
@@ -77,6 +77,8 @@ export async function listPaginated(
   page: number,
   perPage: number,
 ): Promise<PageResult<FavouritedPetRow>> {
+  const where = eq(favourites.userId, callerId);
+
   const rows = await db
     .select({
       ...petFields,
@@ -88,17 +90,31 @@ export async function listPaginated(
     .from(favourites)
     .innerJoin(pets, eq(favourites.petId, pets.id))
     .innerJoin(user, eq(pets.ownerId, user.id))
-    .where(eq(favourites.userId, callerId))
+    .where(where)
     .orderBy(desc(favourites.createdAt), desc(favourites.petId))
     .limit(perPage)
     .offset((page - 1) * perPage);
 
-  const total = rows[0]?.total ?? 0;
+  const total = rows.length > 0 ? (rows[0]?.total ?? 0) : await countFavourites(db, where);
   const items = rows.map(({ total: _total, ...rest }) => ({
     ...rest,
     viewerRequestStatus: rest.viewerRequestStatus as ViewerFlags["viewerRequestStatus"],
   }));
   return { items, total };
+}
+
+/**
+ * Exact count matching a favourites WHERE predicate. Counts the
+ * `favourites` base entity only — no join to `pets`/`user`, and no
+ * `viewerRequestStatus` correlated subquery (that belongs to the SELECT
+ * list on the page query, not to a count).
+ */
+async function countFavourites(db: Executor, where: SQL): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)`.mapWith(Number) })
+    .from(favourites)
+    .where(where);
+  return row?.count ?? 0;
 }
 
 /**

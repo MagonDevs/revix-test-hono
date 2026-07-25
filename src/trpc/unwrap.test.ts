@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { err, ok } from "neverthrow";
 import { describe, expect, it } from "vitest";
 import { AppErrors } from "../errors/app-error.js";
-import { AppErrorCause, DomainThrow, appErrorToTRPCError, toAppError, unwrap } from "./unwrap.js";
+import { AppErrorCause, appErrorToTRPCError, unwrap } from "./unwrap.js";
 
 describe("unwrap", () => {
   it("passes an Ok value through unchanged", () => {
@@ -48,29 +48,5 @@ describe("appErrorToTRPCError — tRPC code mapping (contract §5.1)", () => {
   });
   it("internal_error -> INTERNAL_SERVER_ERROR", () => {
     expect(appErrorToTRPCError(AppErrors.internal("boom")).code).toBe("INTERNAL_SERVER_ERROR");
-  });
-});
-
-describe("toAppError", () => {
-  it("unwraps a DomainThrow back to its AppError", () => {
-    const appError = AppErrors.conflict("request_already_answered", "already answered");
-    const thrown = new DomainThrow(appError);
-    expect(toAppError(thrown)).toBe(appError);
-  });
-
-  it("converts an arbitrary Error into internal_error, keeping it as cause", () => {
-    const original = new Error("db exploded");
-    const result = toAppError(original);
-    expect(result.code).toBe("internal_error");
-    expect(result.message).toBe("db exploded");
-    if (result.code === "internal_error") {
-      expect(result.cause).toBe(original);
-    }
-  });
-
-  it("converts a non-Error throw into internal_error with a generic message", () => {
-    const result = toAppError("some string throw");
-    expect(result.code).toBe("internal_error");
-    expect(result.message).toBe("Unexpected error");
   });
 });

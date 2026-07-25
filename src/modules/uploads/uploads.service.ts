@@ -1,22 +1,24 @@
 import { fileTypeFromBuffer } from "file-type";
 import { ResultAsync } from "neverthrow";
-import { Uuidv7IdAdapter } from "../../adapters/uuidv7.adapter.js";
+import { v7 as uuidv7 } from "uuid";
+import { LIMITS } from "#contracts";
 import { AppErrors, type AppError } from "../../errors/app-error.js";
-import { DomainThrow, toAppError } from "../../trpc/unwrap.js";
+import { DomainThrow, toAppError } from "../../errors/domain-throw.js";
 import * as repo from "./uploads.repository.js";
 import type { Upload } from "#contracts";
 import type { UploadRow } from "./uploads.repository.js";
 import type { Executor } from "../../db/types.js";
+import type { IdPort } from "../../ports/id.port.js";
 import type { ImagePort } from "../../ports/image.port.js";
 import type { StoragePort } from "../../ports/storage.port.js";
-import { LIMITS } from "#contracts";
 
 // Architecture §7 — the upload pipeline. HTTP-only (contract §7.4-7.5):
 // `http/routes/uploads.route.ts` is the thin transport wrapper; the
 // pipeline itself (size guard, sniffing, normalise, store, insert) lives
-// here so it stays testable without an HTTP request.
-
-const idPort = new Uuidv7IdAdapter();
+// here so it stays testable without an HTTP request. `idPort` is a
+// module-level default (see `modules/pets/pets.service.ts`) rather than
+// `new Uuidv7IdAdapter()`, so this file never imports `src/adapters`.
+const idPort: IdPort = { next: () => uuidv7() };
 const MAX_EDGE_PX = 1600;
 
 /** Pure — testable without I/O. */

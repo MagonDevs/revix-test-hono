@@ -1,15 +1,16 @@
+import { authSessionOutputSchema, metaBreedsInputSchema, metaBreedsOutputSchema } from "#contracts";
 import { adoptionRequestsRouter } from "../modules/adoption-requests/index.js";
 import { favouritesRouter } from "../modules/favourites/index.js";
+import { BREEDS_BY_SPECIES } from "../modules/meta/index.js";
 import { petsRouter } from "../modules/pets/index.js";
 import { usersRouter } from "../modules/users/index.js";
-import { BREEDS_BY_SPECIES } from "../seed/data/breeds.js";
 import { publicProcedure, router } from "./init.js";
-import { authSessionOutputSchema, metaBreedsInputSchema, metaBreedsOutputSchema } from "#contracts";
 
 // Curated per-species suggestion list for a free-text combobox (contract
 // §8.6). Not authoritative — `pet.breed` accepts any string within its
-// length limit. Sourced from seed/data/breeds.ts so the seeded pets and
-// this endpoint never drift apart (B4).
+// length limit. Sourced from modules/meta so the seeded pets and this
+// endpoint never drift apart, without production code depending on the
+// seeder (B4).
 
 const metaRouter = router({
   breeds: publicProcedure

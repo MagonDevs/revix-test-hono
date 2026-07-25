@@ -76,7 +76,10 @@ export async function seedLarge(ctx: SeedContext): Promise<ScenarioSummary> {
       sex: at(SEX_CYCLE, i % SEX_CYCLE.length, "SEX_CYCLE"),
       ageMonths: i % 200,
       size: at(SIZE_CYCLE, i % SIZE_CYCLE.length, "SIZE_CYCLE"),
-      weightGrams: 1000 + ((i * 517) % 50000),
+      // Contract §4: weightKg is validated to one decimal place, i.e.
+      // weight_grams must be a whole multiple of 100. Quantise to the
+      // nearest 100g while preserving the deterministic spread.
+      weightGrams: Math.round((1000 + ((i * 517) % 50000)) / 100) * 100,
       city,
       status,
       createdAt,

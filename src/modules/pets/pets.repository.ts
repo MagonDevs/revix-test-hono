@@ -163,10 +163,28 @@ function buildListFilters(filters: PetsListFilters): SQL[] {
 }
 
 /**
+ * Exact count matching a pets WHERE predicate, no joins beyond `pets`
+ * itself (must not count photos or any one-to-many relation, and must
+ * not include viewer-scoped subqueries from the SELECT list).
+ */
+async function countPets(db: Executor, where: SQL): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)`.mapWith(Number) })
+    .from(pets)
+    .where(where);
+  return row?.count ?? 0;
+}
+
+/**
  * Contract §8.3 `pets.list`. Two-query pattern (data model §5): this
  * fetches the page of pets (with `count(*) over()` for `total` and the
  * viewer-flag subqueries) — callers fetch photos separately via
  * `findPhotosByPetIds`, keyed by the returned ids.
+ *
+ * `count(*) over()` is read off the first row, which doesn't exist when
+ * the page is beyond the end (or there are no matches at all) — in
+ * either case we fall back to a plain `COUNT(*)` against the identical
+ * `where` predicate so `total` stays exact (contract §2.1).
  */
 export async function listPaginated(
   db: Executor,
@@ -189,7 +207,7 @@ export async function listPaginated(
     .limit(filters.perPage)
     .offset((filters.page - 1) * filters.perPage);
 
-  const total = rows[0]?.total ?? 0;
+  const total = rows.length > 0 ? (rows[0]?.total ?? 0) : await countPets(db, where);
   return { items: rows.map((r) => toPetRow(r)), total };
 }
 
@@ -234,7 +252,7 @@ export async function listByOwnerPaginated(
     .limit(perPage)
     .offset((page - 1) * perPage);
 
-  const total = rows[0]?.total ?? 0;
+  const total = rows.length > 0 ? (rows[0]?.total ?? 0) : await countPets(db, where);
   return { items: rows.map((r) => toPetRow(r)), total };
 }
 
@@ -255,6 +273,7 @@ export async function listMinePaginated(
 ): Promise<PageResult<OwnedPetRowWithFlags>> {
   const conditions: SQL[] = [eq(pets.ownerId, ownerId)];
   if (filters.status) conditions.push(eq(pets.status, filters.status));
+  const where = and(...conditions) as SQL;
   const flags = viewerFlagFields(ownerId);
 
   const rows = await db
@@ -270,12 +289,12 @@ export async function listMinePaginated(
     })
     .from(pets)
     .innerJoin(user, eq(pets.ownerId, user.id))
-    .where(and(...conditions))
+    .where(where)
     .orderBy(...orderByFor(filters.sort))
     .limit(filters.perPage)
     .offset((filters.page - 1) * filters.perPage);
 
-  const total = rows[0]?.total ?? 0;
+  const total = rows.length > 0 ? (rows[0]?.total ?? 0) : await countPets(db, where);
   return {
     items: rows.map((r) => ({ ...toPetRow(r), pendingRequestCount: r.pendingRequestCount })),
     total,

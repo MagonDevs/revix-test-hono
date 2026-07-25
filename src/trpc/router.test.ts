@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { metaBreedsOutputSchema } from "#contracts";
 import { appRouter } from "./router.js";
 import type { Context } from "./context.js";
-import { metaBreedsOutputSchema } from "#contracts";
 
 function makeContext(): Context {
   return {

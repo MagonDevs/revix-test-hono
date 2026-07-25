@@ -1,6 +1,6 @@
 import { ResultAsync } from "neverthrow";
 import { AppErrors, type AppError } from "../../errors/app-error.js";
-import { DomainThrow, toAppError } from "../../trpc/unwrap.js";
+import { DomainThrow, toAppError } from "../../errors/domain-throw.js";
 import { verifyOwned } from "../uploads/index.js";
 import { mapSessionUser, mapUserProfile } from "./users.mapper.js";
 import * as repo from "./users.repository.js";

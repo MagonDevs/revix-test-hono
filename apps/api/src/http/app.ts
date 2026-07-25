@@ -10,6 +10,7 @@ import { httpErrorHandler } from "./middleware/error-handler.js";
 import { loggerMiddleware } from "./middleware/logger.middleware.js";
 import { rateLimit } from "./middleware/rate-limit.middleware.js";
 import { requestId } from "./middleware/request-id.middleware.js";
+import { createAuthRoutes } from "./routes/auth.route.js";
 import { createHealthRoutes } from "./routes/health.route.js";
 import type { Logger } from "../lib/logger.js";
 
@@ -33,9 +34,10 @@ export function createApp() {
 
   app.route("/", createHealthRoutes(db));
 
-  // Auth mount point (B3): Better Auth's handler + error normalisation.
+  // Auth mount point (B3): Better Auth's handler + error normalisation
+  // (contract §7.1-7.3, 50 req/15min/IP per contract §7).
   app.use("/api/auth/*", rateLimit({ window: "15m", max: 50, by: "ip" }));
-  app.all("/api/auth/*", (c) => c.json({ error: { message: "Not implemented" } }, 501));
+  app.route("/", createAuthRoutes());
 
   // Uploads mount point (B6).
   app.all("/api/uploads/*", (c) => c.json({ error: { message: "Not implemented" } }, 501));
@@ -57,8 +59,8 @@ export function createApp() {
       // `Record<string, unknown>`; our `Context` (architecture §3.1) is a
       // concrete interface, not an index signature. The cast is safe —
       // the shape is exact, tRPC only needs it structurally.
-      createContext: (_opts, c) =>
-        createContext(c as HonoContext<{ Variables: AppVariables }>) as unknown as Record<
+      createContext: async (_opts, c) =>
+        (await createContext(c as HonoContext<{ Variables: AppVariables }>)) as unknown as Record<
           string,
           unknown
         >,

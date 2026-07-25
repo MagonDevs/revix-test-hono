@@ -168,7 +168,17 @@ describe("protectedProcedure / requireSession", () => {
   });
 
   it("passes through and narrows ctx.user when present", async () => {
-    const app = buildTestApp({ id: "user-1", name: "Ana", email: "ana@example.com" });
+    const app = buildTestApp({
+      id: "user-1",
+      name: "Ana",
+      email: "ana@example.com",
+      city: "Madrid",
+      avatarUrl: null,
+      createdAt: new Date("2026-01-01T00:00:00Z"),
+      bio: null,
+      availablePetCount: 0,
+      phone: null,
+    });
     const res = await app.request("/trpc/requiresSession");
     const body = (await res.json()) as { result: { data: { json: { userId: string } } } };
     expect(body.result.data.json.userId).toBe("user-1");

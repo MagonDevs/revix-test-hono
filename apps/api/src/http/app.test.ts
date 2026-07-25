@@ -28,11 +28,6 @@ describe("/trpc/* responses", () => {
 });
 
 describe("placeholder mounts", () => {
-  it("/api/auth/* returns 501 (Better Auth wiring is B3)", async () => {
-    const res = await app.request("/api/auth/session");
-    expect(res.status).toBe(501);
-  });
-
   it("/api/uploads/* returns 501 (upload pipeline is B6)", async () => {
     const res = await app.request("/api/uploads/abc/raw");
     expect(res.status).toBe(501);

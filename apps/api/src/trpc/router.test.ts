@@ -39,3 +39,37 @@ describe("appRouter.meta.breeds", () => {
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });
+
+describe("appRouter.auth.session", () => {
+  it("returns null when anonymous, without erroring (contract §8.1)", async () => {
+    const caller = appRouter.createCaller(makeContext());
+    const result = await caller.auth.session();
+    expect(result).toBeNull();
+  });
+
+  it("returns ctx.user directly when a session is present", async () => {
+    const sessionUser: NonNullable<Context["user"]> = {
+      id: "user-1",
+      name: "Ana",
+      email: "ana@example.com",
+      city: "Madrid",
+      avatarUrl: null,
+      createdAt: new Date("2026-01-01T00:00:00Z"),
+      bio: null,
+      availablePetCount: 0,
+      phone: null,
+    };
+    const caller = appRouter.createCaller({ ...makeContext(), user: sessionUser });
+    const result = await caller.auth.session();
+    expect(result).toEqual(sessionUser);
+  });
+});
+
+describe("appRouter.users.updateMe — protectedProcedure", () => {
+  it("rejects an anonymous caller with unauthenticated", async () => {
+    const caller = appRouter.createCaller(makeContext());
+    await expect(caller.users.updateMe({ city: "Barcelona" })).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+    });
+  });
+});

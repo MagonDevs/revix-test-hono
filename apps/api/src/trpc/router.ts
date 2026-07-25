@@ -1,4 +1,9 @@
-import { metaBreedsInputSchema, metaBreedsOutputSchema } from "@adopta/contracts";
+import {
+  authSessionOutputSchema,
+  metaBreedsInputSchema,
+  metaBreedsOutputSchema,
+} from "@adopta/contracts";
+import { usersRouter } from "../modules/users/index.js";
 import { publicProcedure, router } from "./init.js";
 
 // Curated per-species suggestion list for a free-text combobox (contract
@@ -22,8 +27,17 @@ const metaRouter = router({
     }),
 });
 
+// Contract §8.1 — auth.session returns `SessionUser | null`. Never
+// errors when anonymous: `ctx.user` is already the resolved SessionUser
+// (or null), computed once in `createContext`, so this just reads it.
+const authRouter = router({
+  session: publicProcedure.output(authSessionOutputSchema).query(({ ctx }) => ctx.user),
+});
+
 export const appRouter = router({
   meta: metaRouter,
+  users: usersRouter,
+  auth: authRouter,
 });
 
 export type AppRouter = typeof appRouter;

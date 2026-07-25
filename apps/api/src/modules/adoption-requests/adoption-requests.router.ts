@@ -7,15 +7,17 @@ import {
   adoptionRequestsRespondInputSchema,
   adoptionRequestsWithdrawInputSchema,
 } from "@adopta/contracts";
-import { protectedProcedure, router } from "../../trpc/init.js";
+import { protectedProcedure, rateLimitedProtectedProcedure, router } from "../../trpc/init.js";
 import { unwrap } from "../../trpc/unwrap.js";
 import * as service from "./adoption-requests.service.js";
 
 // Contract §8.4 — router -> service -> unwrap (architecture §2.1). All
 // five procedures are protected: there is no anonymous view of a request.
+// `create` additionally carries the B9 per-user request-creation rate
+// limit (architecture §11) via `rateLimitedProtectedProcedure`.
 
 export const adoptionRequestsRouter = router({
-  create: protectedProcedure
+  create: rateLimitedProtectedProcedure
     .input(adoptionRequestsCreateInputSchema)
     .output(adoptionRequestSchema)
     .mutation(async ({ ctx, input }) => unwrap(await service.create(ctx.db, ctx.user.id, input))),

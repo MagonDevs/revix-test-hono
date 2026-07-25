@@ -18,17 +18,34 @@ services:
       timeout: 5s
       retries: 10
 
-  # api:
-  #   build:
-  #     context: .
-  #     dockerfile: apps/api/Dockerfile
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #   env_file: ./apps/api/.env
-  #   ports:
-  #     - "8787:8787"
-  #   # Uncommented in B2, once apps/api exists and has a Dockerfile.
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 8787
+      DATABASE_URL: postgres://adopta:adopta@postgres:5432/adopta
+      DATABASE_POOL_MAX: 10
+      # Dev-only default so `docker compose up` works out of the box on a
+      # clean checkout with no extra setup; override for anything beyond
+      # local/demo use (B9 README: never a real secret in source control).
+      AUTH_SECRET: ${AUTH_SECRET:-dev-secret-change-me-please-32chars}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:8787}
+      STORAGE_DRIVER: local
+      STORAGE_LOCAL_DIR: /workspace/apps/api/.storage
+      LOG_LEVEL: info
+      SEED_SCENARIO: ${SEED_SCENARIO:-demo}
+      SEED_IMAGE_MODE: ${SEED_IMAGE_MODE:-offline}
+    ports:
+      - "8787:8787"
+    volumes:
+      - adopta_api_storage:/workspace/apps/api/.storage
 
 volumes:
   adopta_postgres_data:
+  adopta_api_storage:

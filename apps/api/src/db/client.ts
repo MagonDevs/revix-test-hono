@@ -1,17 +1,14 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import { env } from "../config/env.js";
 import * as schema from "./schema/index.js";
 
-// B1 note: env parsing is minimal and reads process.env directly with
-// sane defaults. B2's config/env.ts will formalise this with zod
-// validation (architecture §8) and this client should switch to
-// consuming the parsed `env` object at that point.
+// B9: consumes the parsed, boot-validated `env` (config/env.ts) instead of
+// reading `process.env` directly, so `DATABASE_POOL_MAX` (and every other
+// var) fails boot the same way everywhere else does rather than silently
+// falling back to a default in production.
 
-const connectionString =
-  process.env["DATABASE_URL"] ?? "postgres://adopta:adopta@localhost:5432/adopta";
-const max = Number.parseInt(process.env["DATABASE_POOL_MAX"] ?? "10", 10);
-
-export const pool = new Pool({ connectionString, max });
+export const pool = new Pool({ connectionString: env.DATABASE_URL, max: env.DATABASE_POOL_MAX });
 
 export const db = drizzle(pool, { schema });
 

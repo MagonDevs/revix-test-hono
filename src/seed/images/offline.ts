@@ -3,11 +3,6 @@ import sharp from "sharp";
 import { req } from "../util.js";
 import type { Species } from "#contracts";
 
-// Spec §5.1 `offline` mode: "Generate the image locally with sharp — a
-// solid tinted WebP with the pet's name and species in the corner. Zero
-// network." Used by the `large` scenario and whenever SEED_IMAGE_MODE
-// is offline (CI always sets it).
-
 const SPECIES_TINTS: Record<Species, string> = {
   dog: "#c98b52",
   cat: "#7a8bab",
@@ -17,8 +12,6 @@ const SPECIES_TINTS: Record<Species, string> = {
 };
 
 function tintFor(name: string, species: Species): string {
-  // Small deterministic jitter on top of the species base tint so pets
-  // of the same species aren't all pixel-identical.
   const hash = createHash("sha256").update(`${species}:${name}`).digest();
   const base = SPECIES_TINTS[species];
   const r = Number.parseInt(base.slice(1, 3), 16);
@@ -35,10 +28,6 @@ export interface OfflineImageResult {
   height: number;
 }
 
-/**
- * Renders a solid-tinted WebP with the pet's name and species overlaid
- * as text (SVG composited over the tile), entirely offline.
- */
 export async function generateOfflineImage(
   name: string,
   species: Species,

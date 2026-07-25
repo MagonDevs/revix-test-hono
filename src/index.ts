@@ -7,10 +7,6 @@ import { assertNoPendingMigrations } from "./db/migrate.js";
 import { app } from "./http/app.js";
 import { rootLogger } from "./lib/logger.js";
 
-// Entry point: parse env (module-load side effect of config/env.ts) →
-// assert no pending migrations → serve. Migrations themselves run as a
-// release step (architecture §8), never on boot.
-
 async function main(): Promise<void> {
   await assertNoPendingMigrations(db);
 

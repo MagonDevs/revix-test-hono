@@ -1,7 +1,3 @@
-// Module public API (architecture §2.1). `pets.service` calls
-// `verifyOwnedUnconsumed`/`consumeUploads` through here, passing its own
-// transaction — never `uploads.repository` directly.
-
 export {
   checkSize,
   consumeUploads,

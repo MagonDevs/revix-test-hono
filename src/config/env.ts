@@ -1,10 +1,5 @@
 import { z } from "zod";
 
-// Architecture §8 — parsed once at boot. The process exits with a readable
-// message rather than failing on the first request. The schema and the
-// parse function are kept separate and exported so they stay testable in
-// isolation, without triggering `process.exit` as a side effect of import.
-
 export const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(8787),
@@ -21,11 +16,6 @@ export const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
-/**
- * Parses and validates `process.env`-shaped input against {@link envSchema}.
- * Kept separate from module-level parsing so tests can exercise both valid
- * and invalid input without mutating `process.env` or triggering an exit.
- */
 export function parseEnv(source: Record<string, string | undefined> = process.env): Env {
   const result = envSchema.safeParse(source);
   if (!result.success) {
@@ -37,9 +27,4 @@ export function parseEnv(source: Record<string, string | undefined> = process.en
   return result.data;
 }
 
-/**
- * Parsed once at import time for real entry points (index.ts, and anything
- * that needs the live config). Tests that want to exercise failure modes
- * should call {@link parseEnv} directly instead of importing this.
- */
 export const env: Env = parseEnv();

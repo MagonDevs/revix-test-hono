@@ -40,18 +40,9 @@ export interface AttachPhotosInput {
   createdAt: Date;
   mode: SeedImageMode;
   storage: StoragePort;
-  /** Deterministic id/offset generators, injected so callers control the id sequence. */
   nextId: () => string;
 }
 
-/**
- * Builds `uploads` + `pet_photos` rows for one pet's photo set, per the
- * seed image mode (spec §5.1):
- *  - `ingest`: download once (or read the .seed-cache/ hit), run the real
- *    sharp pipeline, write bytes to storage.
- *  - `remote`: store the provider URL as storage_key directly, no download.
- *  - `offline`: render a local tinted WebP with sharp, zero network.
- */
 export async function attachPhotos(input: AttachPhotosInput): Promise<AttachPhotosResult> {
   const uploads: UploadRow[] = [];
   const photos: PetPhotoRow[] = [];
@@ -68,8 +59,6 @@ export async function attachPhotos(input: AttachPhotosInput): Promise<AttachPhot
 
     if (input.mode === "remote") {
       storageKey = imageUrlFor(input.species, position, width, height);
-      // No bytes to measure; store the requested target dimensions and a
-      // generic mime type since the real content is fetched on read.
       byteSize = 0;
       mimeType = "image/jpeg";
     } else if (input.mode === "offline") {

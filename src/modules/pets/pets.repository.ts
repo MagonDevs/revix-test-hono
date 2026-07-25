@@ -8,24 +8,12 @@ import type { AgeGroup, PetSize, PetSort, PetStatus, Species, Sex } from "#contr
 import type { PetPhotoRow, PetRow, ViewerFlags } from "./pets.mapper.js";
 import type { Executor } from "../../db/types.js";
 
-// Drizzle-only, own module types, no business rules beyond query shape
-// (architecture §2.1). Business rules (age group ranges, the public
-// status set) live in pets.domain.ts and are imported, not re-derived.
-
-/**
- * Architecture §4.1 — visibility is a query concern. A stranger sees
- * only `available`/`reserved`; the owner sees their own pet in any
- * status. Used by `findById` (rule R-2). Public *lists* (`pets.list`,
- * `pets.listByOwner`) use a fixed public-status predicate instead —
- * R-1/R-3 hide `adopted`/`withdrawn` even from the owner there.
- */
 function visibilityPredicate(viewerId: string | null): SQL {
   return viewerId
     ? (or(inArray(pets.status, PUBLIC_LIST_STATUSES), eq(pets.ownerId, viewerId)) as SQL)
     : inArray(pets.status, PUBLIC_LIST_STATUSES);
 }
 
-/** R-20 — computed per caller. Anonymous callers get literal `false`/`null`, never a join on a null id. */
 function viewerFlagFields(viewerId: string | null) {
   return {
     isFavourited: viewerId
@@ -162,11 +150,6 @@ function buildListFilters(filters: PetsListFilters): SQL[] {
   return conditions;
 }
 
-/**
- * Exact count matching a pets WHERE predicate, no joins beyond `pets`
- * itself (must not count photos or any one-to-many relation, and must
- * not include viewer-scoped subqueries from the SELECT list).
- */
 async function countPets(db: Executor, where: SQL): Promise<number> {
   const [row] = await db
     .select({ count: sql<number>`count(*)`.mapWith(Number) })
@@ -175,17 +158,6 @@ async function countPets(db: Executor, where: SQL): Promise<number> {
   return row?.count ?? 0;
 }
 
-/**
- * Contract §8.3 `pets.list`. Two-query pattern (data model §5): this
- * fetches the page of pets (with `count(*) over()` for `total` and the
- * viewer-flag subqueries) — callers fetch photos separately via
- * `findPhotosByPetIds`, keyed by the returned ids.
- *
- * `count(*) over()` is read off the first row, which doesn't exist when
- * the page is beyond the end (or there are no matches at all) — in
- * either case we fall back to a plain `COUNT(*)` against the identical
- * `where` predicate so `total` stays exact (contract §2.1).
- */
 export async function listPaginated(
   db: Executor,
   filters: PetsListFilters,
@@ -211,7 +183,6 @@ export async function listPaginated(
   return { items: rows.map((r) => toPetRow(r)), total };
 }
 
-/** Contract §8.3 `pets.byId` — same visibility rule as R-2, single row. */
 export async function findById(
   db: Executor,
   petId: string,
@@ -227,7 +198,6 @@ export async function findById(
   return row ? toPetRow(row) : undefined;
 }
 
-/** Contract §8.3 `pets.listByOwner` — `available` only, regardless of caller (R-3). */
 export async function listByOwnerPaginated(
   db: Executor,
   ownerId: string,
@@ -265,7 +235,6 @@ export interface PetsListMineFilters {
 
 type OwnedPetRowWithFlags = PetRowWithFlags & { pendingRequestCount: number };
 
-/** Contract §8.3 `pets.listMine` — all statuses, owned-only, plus pendingRequestCount. */
 export async function listMinePaginated(
   db: Executor,
   ownerId: string,
@@ -301,11 +270,6 @@ export async function listMinePaginated(
   };
 }
 
-/**
- * Photos for a page of pets, keyed by `pet_id`, ordered by `position`
- * (index 0 = cover). Fetched in a second query, never joined before
- * pagination (data model §5.1).
- */
 export async function findPhotosByPetIds(
   db: Executor,
   petIds: string[],
@@ -343,11 +307,6 @@ export async function findPhotosByPetIds(
   return byPet;
 }
 
-// --- Write side (B6): pets.create/update/setStatus/remove -----------------
-// R-2 applies here too: writes are scoped by `ownerId` in the WHERE, not
-// a post-fetch check, so "not the owner" and "doesn't exist" both come
-// back as `undefined` -> the service maps that to `not_found`.
-
 export interface InsertPetInput {
   id: string;
   ownerId: string;
@@ -368,7 +327,6 @@ export interface InsertPetInput {
   updatedAt: Date;
 }
 
-/** R-4 — status is never accepted here; the column default is `available`. */
 export async function insert(db: Executor, input: InsertPetInput): Promise<void> {
   await db.insert(pets).values(input);
 }
@@ -386,7 +344,6 @@ export async function insertPhotos(db: Executor, rows: InsertPhotoInput[]): Prom
   await db.insert(petPhotos).values(rows);
 }
 
-/** R-16 — replacing the whole ordered set is delete-then-reinsert, one transaction. */
 export async function deletePhotosByPetId(db: Executor, petId: string): Promise<void> {
   await db.delete(petPhotos).where(eq(petPhotos.petId, petId));
 }
@@ -407,7 +364,6 @@ export interface UpdatePetPatch {
   isGoodWithPets?: boolean;
 }
 
-/** Scoped by `ownerId` — R-2: not the owner returns `undefined`, same as "doesn't exist". */
 export async function update(
   db: Executor,
   petId: string,
@@ -431,7 +387,6 @@ export async function update(
   return row;
 }
 
-/** The pet's current status, scoped by owner (used to validate a legal transition before writing). */
 export async function findOwnedStatus(
   db: Executor,
   petId: string,
@@ -460,7 +415,6 @@ export async function setStatus(
   return row;
 }
 
-/** R-17 — cascade to photos/requests/favourites is FK-level (data model §4); this is a plain delete. */
 export async function deleteById(
   db: Executor,
   petId: string,

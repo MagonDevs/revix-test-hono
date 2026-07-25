@@ -59,9 +59,6 @@ describe("GET /pets query", () => {
   });
 
   it("ignores unknown query params rather than rejecting the request", () => {
-    // A stray `?_=1699999` cache-buster must not turn a valid search into
-    // a 400 — unlike a request body, a query string is routinely decorated
-    // by clients and proxies.
     const result = petsListQuerySchema.safeParse({ bogus: "true" });
     expect(result.success).toBe(true);
   });

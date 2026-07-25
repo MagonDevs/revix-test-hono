@@ -5,12 +5,6 @@ import { env } from "../config/env.js";
 import { closeDb, db } from "../db/client.js";
 import { deleteById, findUnconsumedOlderThan } from "../modules/uploads/index.js";
 
-// Architecture §7 / build-plan B6 — `pnpm sweep:uploads`. Deletes
-// unreferenced (never attached to a pet, `consumed_at IS NULL`) uploads
-// older than 24 hours. Scheduling this is a deployment concern (cron,
-// not an in-app scheduler) — this script is just the logic + a wired
-// package.json entry point.
-
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 
 async function main(): Promise<void> {

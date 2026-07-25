@@ -2,12 +2,6 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, normalize, sep } from "node:path";
 import type { StoragePort } from "../ports/storage.port.js";
 
-/**
- * Local filesystem StoragePort. `baseDir` is the root all keys are
- * resolved under; keys are always server-generated, never derived from
- * user input, but the path is still normalised and bounds-checked
- * defensively.
- */
 export class LocalStorageAdapter implements StoragePort {
   private readonly baseDir: string;
 

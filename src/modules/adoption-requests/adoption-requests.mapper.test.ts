@@ -3,10 +3,6 @@ import { mapAdoptionRequest } from "./adoption-requests.mapper.js";
 import type { AdoptionRequestRow } from "./adoption-requests.mapper.js";
 import type { PetPhotoRow } from "../pets/index.js";
 
-// Contract §6.7 — pure rows -> AdoptionRequest mapper. No I/O, no Docker
-// required. R-19 is the star: `contact` is populated only on `accepted`,
-// only for the two parties, and holds the *counterparty's* details.
-
 const adopter: AdoptionRequestRow["adopter"] = {
   id: "adopter-1",
   name: "Bea",

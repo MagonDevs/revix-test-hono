@@ -7,16 +7,6 @@ import { startTestDb, withRollback, type TestDb } from "../../db/test/testcontai
 import * as service from "./adoption-requests.service.js";
 import type { Database, Transaction } from "../../db/types.js";
 
-// Architecture §9 — every rule in contract §9 gets a test that cites its
-// number. Docker required (Testcontainers Postgres).
-//
-// STATUS: not run in this sandbox — `docker ps` fails ("... no such file
-// or directory"). Written to be correct and to run unmodified via
-// `pnpm test:integration` once Docker is available. R-12 and R-13 are the
-// two rules whose real value can ONLY be proven against a live Postgres
-// (SELECT ... FOR UPDATE semantics and transaction rollback can't be
-// faithfully unit-tested) — they are unverified pending Docker.
-
 let testDb: TestDb;
 
 async function insertUser(
@@ -213,15 +203,6 @@ describe("adoptionRequests.service (requires Docker)", () => {
   });
 
   it("R-9: cannot request an adopted or withdrawn pet", async () => {
-    // Contract defect (see CHANGELOG.md and docs/notes/architecture-divergences.md):
-    // §8.4/R-9 says adopted/withdrawn -> conflict/pet_unavailable, but
-    // §5.4/R-2's 404-over-403 rule makes an adopted/withdrawn pet invisible
-    // to a non-owner stranger, so `not_found` fires first in `create()`.
-    // The only caller who *can* see the pet in that state is the owner,
-    // who is already rejected earlier by R-7 (self_request). That makes
-    // `pet_unavailable` unreachable through this path, and the security
-    // rule (don't leak existence of records the caller can't see) wins:
-    // the still-correct, still-desired behavior is `not_found`.
     for (const status of ["adopted", "withdrawn"] as const) {
       await withRollback(testDb.db, async (tx) => {
         const guardianId = uuidv7();
@@ -276,9 +257,6 @@ describe("adoptionRequests.service (requires Docker)", () => {
         petId,
         message: MESSAGE,
       });
-      // R-9's pet_unavailable only fires once the pet is visible; a
-      // withdrawn pet is invisible to a non-owner, so this is not_found,
-      // never conflict — contract §5.4's 404-over-403 rule.
       expect(result.isErr()).toBe(true);
       if (result.isErr()) expect(result.error.code).toBe("not_found");
     });
@@ -322,8 +300,6 @@ describe("adoptionRequests.service (requires Docker)", () => {
       expect(reqA.isOk() && reqB.isOk() && reqC.isOk()).toBe(true);
       if (!reqA.isOk() || !reqB.isOk() || !reqC.isOk()) return;
 
-      // Decline B — it should sort after the still-pending A and C,
-      // despite being created in between them.
       await service.respond(tx as unknown as Database, guardianId, {
         requestId: reqB.value.id,
         status: "declined",
@@ -339,7 +315,6 @@ describe("adoptionRequests.service (requires Docker)", () => {
       if (!list.isOk()) return;
 
       const ids = list.value.items.map((r) => r.id);
-      // pending first (C then A, newest createdAt first), declined last.
       expect(ids).toEqual([reqC.value.id, reqA.value.id, reqB.value.id]);
     });
   });
@@ -361,7 +336,6 @@ describe("adoptionRequests.service (requires Docker)", () => {
         city: "Madrid",
       });
 
-      // Three requests, so with perPage 10 there is exactly one real page.
       for (let i = 0; i < 3; i += 1) {
         const petId = uuidv7();
         await insertPet(tx, { id: petId, ownerId: guardianId });
@@ -513,9 +487,6 @@ describe("adoptionRequests.service (requires Docker)", () => {
         if (created.isOk()) requestId = created.value.id;
       });
 
-      // Two genuinely concurrent transactions racing on the SAME row —
-      // this is the one place `withRollback`'s single outer transaction
-      // wouldn't do (it would serialize both calls onto one connection).
       const [a, b] = await Promise.all([
         service.respond(testDb.db, guardianId, {
           requestId,
@@ -574,8 +545,6 @@ describe("adoptionRequests.service (requires Docker)", () => {
       expect(created.isOk()).toBe(true);
       if (!created.isOk()) return;
 
-      // Move the pet to `adopted` out from under the request — `adopted`
-      // cannot legally transition to `reserved` (pets.domain.ts).
       await tx.update(pets).set({ status: "adopted" }).where(eq(pets.id, petId));
 
       const result = await service.respond(tx as unknown as Database, guardianId, {
@@ -591,7 +560,6 @@ describe("adoptionRequests.service (requires Docker)", () => {
           expect(result.error.reason).toBe("invalid_transition");
       }
 
-      // Nothing changed: request still pending, pet still adopted.
       const [petRow] = await tx.select().from(pets).where(eq(pets.id, petId));
       expect(petRow?.status).toBe("adopted");
 

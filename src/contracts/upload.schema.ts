@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { idSchema } from "./primitives.js";
 
-// §6.8 — Upload
 export const uploadSchema = z.object({
   id: idSchema,
   url: z.string(),

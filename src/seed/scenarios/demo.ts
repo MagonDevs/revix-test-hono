@@ -16,11 +16,6 @@ import { at } from "../util.js";
 import type { Species, PetStatus, RequestStatus, Sex, PetSize } from "#contracts";
 import type { ScenarioSummary, SeedContext } from "../context.js";
 
-// Spec §4 `demo` — 8 users; 40 pets (28 available, 5 reserved, 5
-// adopted, 2 withdrawn) across 6 cities, createdAt spread over 90 days;
-// 14 adoption requests across every status incl. >=1 accepted pair; 6
-// favourites for marta@example.com/password123.
-
 const DEMO_USERS = [
   { name: "Marta Ruiz", email: "marta@example.com", city: "Madrid" },
   { name: "Diego Fernandez", email: "diego@example.com", city: "Barcelona" },
@@ -39,7 +34,6 @@ const SEX_CYCLE: Sex[] = ["male", "female", "unknown"];
 const SIZE_CYCLE: PetSize[] = ["small", "medium", "large"];
 
 function statusForIndex(index: number): PetStatus {
-  // 28 available (0-27), 5 reserved (28-32), 5 adopted (33-37), 2 withdrawn (38-39)
   if (index < 28) return "available";
   if (index < 33) return "reserved";
   if (index < 38) return "adopted";
@@ -84,9 +78,6 @@ export async function seedDemo(ctx: SeedContext): Promise<ScenarioSummary> {
       sex: at(SEX_CYCLE, i % SEX_CYCLE.length, "SEX_CYCLE"),
       ageMonths: 3 + ((i * 7) % 150),
       size: at(SIZE_CYCLE, i % SIZE_CYCLE.length, "SIZE_CYCLE"),
-      // Contract §4: weightKg is validated to one decimal place, i.e.
-      // weight_grams must be a whole multiple of 100. Quantise to the
-      // nearest 100g while preserving the deterministic spread.
       weightGrams: Math.round((1500 + ((i * 733) % 40000)) / 100) * 100,
       city,
       status,
@@ -114,7 +105,6 @@ export async function seedDemo(ctx: SeedContext): Promise<ScenarioSummary> {
     photoRows.push(...photos);
   }
 
-  // 14 adoption requests across every status, >=1 accepted pair.
   const REQUEST_STATUSES: RequestStatus[] = [
     "pending",
     "pending",
@@ -134,7 +124,6 @@ export async function seedDemo(ctx: SeedContext): Promise<ScenarioSummary> {
   const requestRows: AdoptionRequestRow[] = [];
   for (let i = 0; i < REQUEST_STATUSES.length; i++) {
     const pet = at(petRows, i % petRows.length, "petRows");
-    // Pick an adopter distinct from the pet's owner.
     const adopter =
       users.find((u) => u.id !== pet.ownerId) ?? at(users, (i + 1) % users.length, "users");
     const createdAt = seededDate(60 - i * 2);
@@ -151,7 +140,6 @@ export async function seedDemo(ctx: SeedContext): Promise<ScenarioSummary> {
     );
   }
 
-  // 6 favourites for the demo user, on pets Marta doesn't own.
   const favouriteRows: FavouriteRow[] = [];
   const candidates = petRows.filter((p) => p.ownerId !== marta.id);
   for (let i = 0; i < 6; i++) {

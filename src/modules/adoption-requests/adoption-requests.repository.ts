@@ -10,9 +10,6 @@ import type { AdoptionRequestRow } from "./adoption-requests.mapper.js";
 import type { Executor } from "../../db/types.js";
 import type { PetPhotoRow } from "../pets/index.js";
 
-// Drizzle-only, own module types, no business rules beyond query shape
-// (architecture §2.1).
-
 const adopterUser = alias(user, "adopter_user");
 const guardianUser = alias(user, "guardian_user");
 
@@ -38,12 +35,6 @@ export interface InsertAdoptionRequestInput {
   createdAt: Date;
 }
 
-/**
- * Plain insert. R-7 (self-request) and R-8 (duplicate active request) are
- * enforced at the DB level (check constraint / partial unique index,
- * schema §adoption_requests) — the service pre-checks both for a good
- * error message, but this is the backstop if that check ever races.
- */
 export async function insert(db: Executor, input: InsertAdoptionRequestInput): Promise<void> {
   await db.insert(adoptionRequests).values({
     id: input.id,
@@ -67,12 +58,6 @@ export interface RawRequestRow {
   respondedAt: Date | null;
 }
 
-/**
- * R-12 — `SELECT ... FOR UPDATE`. This is what makes "only one pending
- * request can be answered" true under two simultaneous `respond()` calls;
- * a read-then-write would let both callers win. Must be called inside a
- * transaction.
- */
 export async function findByIdForUpdate(
   db: Executor,
   requestId: string,
@@ -86,11 +71,6 @@ export async function findByIdForUpdate(
   return row;
 }
 
-/**
- * Joined read for the mapper (R-19's ingredients) + R-11's visibility —
- * scoped in the query to the two parties, not a post-fetch check. A
- * non-party (or a nonexistent id) simply comes back `undefined`.
- */
 export async function findByIdWithParties(
   db: Executor,
   requestId: string,
@@ -142,7 +122,6 @@ export async function setStatus(
   return row;
 }
 
-/** R-8's backing lookup: active = `pending` or `accepted`. */
 export async function findActiveByPetAndAdopter(
   db: Executor,
   petId: string,
@@ -176,11 +155,6 @@ export interface PageResult<T> {
   total: number;
 }
 
-/**
- * R-10 — `pending` first, then `createdAt DESC, id DESC`. `role` is
- * required by the input schema (no default): `guardian` scopes to
- * `guardianId = callerId`, `adopter` to `adopterId = callerId`.
- */
 export async function listPaginated(
   db: Executor,
   filters: AdoptionRequestsListFilters,
@@ -230,12 +204,6 @@ export async function listPaginated(
   return { items, total };
 }
 
-/**
- * Exact count matching an adoption-requests WHERE predicate. No joins to
- * `pets`/`user` — those exist in the page query only to hydrate row
- * fields, and joining them here would risk multiplying rows if any join
- * were ever one-to-many.
- */
 async function countAdoptionRequests(db: Executor, where: SQL): Promise<number> {
   const [row] = await db
     .select({ count: sql<number>`count(*)`.mapWith(Number) })
@@ -244,13 +212,6 @@ async function countAdoptionRequests(db: Executor, where: SQL): Promise<number> 
   return row?.count ?? 0;
 }
 
-/**
- * R-6: called by `modules/pets`'s `setStatus` (via this module's
- * `index.ts`, architecture §6.1) inside the same transaction that marks
- * the pet `adopted`, so the two writes stay atomic. Declines every
- * `pending` request for the pet — `accepted`/`declined`/`withdrawn` rows
- * are left untouched.
- */
 export async function declinePendingForPet(
   db: Executor,
   petId: string,
@@ -262,7 +223,6 @@ export async function declinePendingForPet(
     .where(and(eq(adoptionRequests.petId, petId), eq(adoptionRequests.status, "pending")));
 }
 
-/** Cover photos (position 0) for a page of requests' pets, keyed by `pet_id`. */
 export async function findCoverPhotosByPetIds(
   db: Executor,
   petIds: string[],

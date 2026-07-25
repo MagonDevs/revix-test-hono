@@ -23,12 +23,6 @@ import type { PetPhotoRow } from "./pets.mapper.js";
 import type { Database, Executor } from "../../db/types.js";
 import type { IdPort } from "../../ports/id.port.js";
 
-// Architecture §2.1 — service may import own repository/mapper/domain,
-// other modules' `index.ts`, and `ports`, not Drizzle or `adapters`. Returns
-// `ResultAsync<T, AppError>`. `idPort` is a module-level default rather than
-// a `new Uuidv7IdAdapter()` construction, so this file never imports
-// `src/adapters` — it's the same concrete generator, just not reached
-// through the adapters layer, which the transport/composition root owns.
 const idPort: IdPort = { next: () => uuidv7() };
 
 class PetNotFound extends Error {}
@@ -62,11 +56,6 @@ export function list(
   );
 }
 
-/**
- * Visibility (R-2) is already baked into `findById`'s query — a row
- * that comes back nonexistent means "not visible to this caller", not
- * "exists but forbidden". There is no separate check-then-reject step.
- */
 export function byId(
   db: Executor,
   petId: string,
@@ -133,20 +122,11 @@ export function listMine(
   );
 }
 
-// --- Write side (B6) --------------------------------------------------
-
 function weightKgToGrams(weightKg: number | null | undefined): number | null | undefined {
   if (weightKg === undefined) return undefined;
   return weightKg === null ? null : Math.round(weightKg * 1000);
 }
 
-/**
- * R-14/R-15: every `uploadId` must be owned by the caller and
- * unconsumed. Rejects via a `validation_error` with a field error on
- * the exact `photos[i].uploadId` path (contract §5.3), throwing
- * `DomainThrow` so callers can invoke this from inside or outside a
- * transaction uniformly.
- */
 async function assertPhotosOwnedUnconsumed(
   db: Executor,
   photos: ReadonlyArray<{ uploadId: string }>,
@@ -171,12 +151,6 @@ async function assertPhotosOwnedUnconsumed(
   }
 }
 
-/**
- * Contract §8.3 `pets.create`. Ownership/consumption check happens
- * before the transaction (a pure read — nothing to roll back), then
- * insert pet + photos + mark uploads consumed all in one transaction
- * (architecture §7 last paragraph, R-14/R-15).
- */
 export function create(
   db: Database,
   callerId: string,
@@ -239,12 +213,6 @@ export function create(
   );
 }
 
-/**
- * Contract §8.3 `pets.update`. R-2: not the owner -> `not_found`, via
- * `repo.update`'s `ownerId`-scoped WHERE, never a post-fetch check. R-16:
- * if `photos` is present it replaces the whole ordered set inside the
- * same transaction as the field patch.
- */
 export function update(
   db: Database,
   callerId: string,
@@ -310,16 +278,6 @@ export function update(
   );
 }
 
-/**
- * Contract §8.3 `pets.setStatus`. R-5: legal transitions only, checked
- * against `pets.domain.ts`'s `isLegalTransition`, inside the same
- * transaction that writes the new status (avoids a check-then-write
- * race). R-6: moving to `adopted` with `declinePendingRequests` (default
- * true) declines every `pending` request for the pet in that same
- * transaction. Follows architecture §6.2's `respond()` pattern exactly:
- * `DomainThrow` inside `db.transaction`, converted back to `Err` by
- * `toAppError` outside it.
- */
 export function setStatus(
   db: Database,
   callerId: string,
@@ -361,7 +319,6 @@ export function setStatus(
   );
 }
 
-/** Contract §8.3 `pets.remove`. Hard delete; cascades to photos/requests/favourites (R-17, FK-level). */
 export function remove(
   db: Database,
   callerId: string,

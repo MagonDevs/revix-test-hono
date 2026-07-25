@@ -15,8 +15,6 @@ import { customType } from "drizzle-orm/pg-core";
 import { user } from "./auth.js";
 import { petSizeEnum, petStatusEnum, sexEnum, speciesEnum } from "./enums.js";
 
-// tsvector has no first-class Drizzle column type; a minimal custom type
-// is the standard approach (data model §3, §4).
 const tsvector = customType<{ data: string }>({
   dataType() {
     return "tsvector";
@@ -26,7 +24,7 @@ const tsvector = customType<{ data: string }>({
 export const pets = pgTable(
   "pets",
   {
-    id: uuid("id").primaryKey(), // uuid v7, generated in app
+    id: uuid("id").primaryKey(),
     ownerId: text("owner_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -36,7 +34,7 @@ export const pets = pgTable(
     sex: sexEnum("sex").notNull(),
     ageMonths: smallint("age_months").notNull(),
     size: petSizeEnum("size").notNull(),
-    weightGrams: integer("weight_grams"), // §4: integer, not numeric — pg returns numeric as string
+    weightGrams: integer("weight_grams"),
     description: text("description").notNull(),
     city: varchar("city", { length: 80 }).notNull(),
     status: petStatusEnum("status").notNull().default("available"),

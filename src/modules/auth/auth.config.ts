@@ -6,22 +6,6 @@ import { env } from "../../config/env.js";
 import { db } from "../../db/client.js";
 import * as authSchema from "../../db/schema/auth.js";
 
-// Architecture §5.1. B3: wired to the parsed `env` (config/env.ts) instead
-// of reading `process.env` directly, so a missing/invalid var fails boot
-// the same way everywhere else does.
-//
-// §5.2 — one public origin: `baseURL`/`trustedOrigins` are the CLIENT's
-// public origin (env.PUBLIC_ORIGIN), not this API's own origin. Better
-// Auth uses `baseURL` to build absolute links (e.g. email verification)
-// and validates `trustedOrigins` for CSRF — both must point at the
-// origin the browser actually talks to.
-//
-// VERIFIED against the installed better-auth@1.6.25 package.json
-// `exports` map: `better-auth/adapters/drizzle` is the correct subpath
-// (see docs/notes/better-auth.md — this specific item is no longer
-// unverified). Cookie name / auth table shape are still pending a live
-// sign-in round trip per that note.
-
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg", schema: authSchema }),
   baseURL: env.PUBLIC_ORIGIN,
@@ -44,12 +28,6 @@ export const auth = betterAuth({
   session: { expiresIn: 60 * 60 * 24 * 30, updateAge: 60 * 60 * 24 },
   advanced: {
     cookiePrefix: "adopta",
-    // Better Auth's default id generator emits its own random string, but
-    // the contract types every id — users included — as a UUID
-    // (contracts/primitives.ts), and `user.id` is echoed on every
-    // `UserSummary`. Generating uuidv7 here keeps the auth-owned tables
-    // in the same id space as everything else; the columns are `text`, so
-    // this is a value change only, not a schema one.
     database: { generateId: () => uuidv7() },
   },
 });

@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { dimensionsFor, photoCountFor } from "./pet.factory.js";
 
-// Spec §5.3: "Photo counts are weighted, not uniform: 1 photo (20%),
-// 2-3 (55%), 4-6 (25%)." Verified here by sampling the unit interval
-// densely and checking the resulting distribution's shape.
-
 describe("photoCountFor", () => {
   it("returns counts in [1, 6]", () => {
     for (let i = 0; i < 1000; i++) {

@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-// §3 — Enums. Exact values; adding one is a contract change.
-
 export const speciesSchema = z.enum(["dog", "cat", "rabbit", "bird", "other"]);
 export type Species = z.infer<typeof speciesSchema>;
 
@@ -26,8 +24,6 @@ export type PetSort = z.infer<typeof petSortSchema>;
 export const requestRoleSchema = z.enum(["adopter", "guardian"]);
 export type RequestRole = z.infer<typeof requestRoleSchema>;
 
-// §3.1 — Age groups. `ageGroup` is derived from `ageMonths`, never stored,
-// never accepted as pet input. Boundaries are inclusive on both ends.
 export const AGE_GROUP_MONTHS = {
   baby: [0, 5],
   young: [6, 23],

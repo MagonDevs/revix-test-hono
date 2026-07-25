@@ -2,11 +2,6 @@ import { describe, expect, it } from "vitest";
 import { LIMITS } from "#contracts";
 import { checkSize, isAllowedMime, sniffMime } from "./uploads.service.js";
 
-// Pure/no-DB pieces of the upload pipeline (architecture §7 steps 3-4).
-// No Docker required.
-
-// 1x1 PNG (real magic bytes) — proves content-sniffing works on real
-// bytes rather than a mocked detector.
 const ONE_PX_PNG = Uint8Array.from(
   Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
@@ -52,11 +47,6 @@ describe("sniffMime", () => {
   });
 
   it("a PNG renamed .jpg is still sniffed as PNG and is on the allow-list", async () => {
-    // The route never trusts the filename/declared content-type (architecture
-    // §7 step 4) — sniffing only ever looks at the bytes, so a `.jpg`
-    // filename on these PNG bytes changes nothing here, and PNG is itself
-    // in LIMITS.upload.mimeTypes, so it's correctly accepted rather than
-    // rejected for a mismatched extension.
     const mime = await sniffMime(ONE_PX_PNG);
     expect(isAllowedMime(mime)).toBe(true);
     expect(mime).toBe("image/png");

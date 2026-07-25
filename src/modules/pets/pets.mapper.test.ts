@@ -2,9 +2,6 @@ import { describe, expect, it } from "vitest";
 import { mapOwnedPet, mapPet, mapPetPhoto } from "./pets.mapper.js";
 import type { PetPhotoRow, PetRow, ViewerFlags } from "./pets.mapper.js";
 
-// Contract §6.4-6.6 — pure rows -> Pet/PetPhoto/OwnedPet mappers. No I/O,
-// no Docker required.
-
 const guardian: PetRow["guardian"] = {
   id: "user-1",
   name: "Ana",

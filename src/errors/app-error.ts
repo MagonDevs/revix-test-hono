@@ -1,9 +1,5 @@
 import type { ConflictReason, FieldError } from "#contracts";
 
-// Architecture §4 — the AppError discriminated union. Services return
-// `ResultAsync<T, AppError>`; nothing returns a `Result` across the HTTP
-// boundary (`http/lib/respond.ts`'s `unwrap()` converts it at the route).
-
 export type AppError =
   | { code: "validation_error"; message: string; fieldErrors: FieldError[] }
   | { code: "unauthenticated"; message: string }

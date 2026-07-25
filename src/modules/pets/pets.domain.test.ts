@@ -2,10 +2,6 @@ import { describe, expect, it } from "vitest";
 import { ageGroupRange, isLegalTransition, PUBLIC_LIST_STATUSES } from "./pets.domain.js";
 import type { PetStatus } from "#contracts";
 
-// Contract §3.1 age group boundaries, §8.3 pets.setStatus transition
-// matrix (rule R-5), §8.3 pets.list status filter (rule R-1). Pure, no
-// I/O — no Docker required.
-
 describe("ageGroupRange", () => {
   it.each([
     ["baby", [0, 5]],

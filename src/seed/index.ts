@@ -13,9 +13,6 @@ import { req } from "./util.js";
 import type { SeedContext, ScenarioSummary } from "./context.js";
 import type { SeedImageMode } from "./images/attach.js";
 
-// Spec §4/§6 — CLI entry: `pnpm db:seed --scenario=demo --reset`,
-// `pnpm db:reset` (alias for `--scenario=demo --reset`).
-
 type Scenario = "demo" | "empty" | "large" | "edge";
 
 const SCENARIOS: Record<Scenario, (ctx: SeedContext) => Promise<ScenarioSummary>> = {

@@ -3,7 +3,6 @@ import { DomainThrow } from "../../errors/domain-throw.js";
 import type { MiddlewareHandler } from "hono";
 
 export interface RateLimitOptions {
-  /** e.g. "15m" — parsed to milliseconds. */
   window: string;
   max: number;
   by: "ip";
@@ -17,15 +16,6 @@ export function parseWindowMs(window: string): number {
   return Number(amount) * multiplier;
 }
 
-/**
- * An in-memory, single-process fixed-window limiter keyed by client IP —
- * for the routes where the caller has no identity yet (auth). Identified
- * callers are limited by `userRateLimit` instead.
- *
- * Not safe across replicas: each process keeps its own counters, so the
- * effective limit multiplies by the replica count. A shared store is the
- * real fix and is out of scope here.
- */
 export function rateLimit(options: RateLimitOptions): MiddlewareHandler {
   const windowMs = parseWindowMs(options.window);
   const hits = new Map<string, { count: number; resetAt: number }>();

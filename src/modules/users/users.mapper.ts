@@ -1,10 +1,5 @@
 import type { SessionUser, UserProfile, UserSummary } from "#contracts";
 
-// Pure rows -> contract output mappers (architecture §3 layer rules).
-// R-22: email/phone appear ONLY on SessionUser — mapUserSummary and
-// mapUserProfile must never read/return them.
-
-/** Shape of a row read from the `user` table (db/schema/auth.ts). */
 export interface UserRow {
   id: string;
   name: string;
@@ -22,8 +17,6 @@ export function mapUserSummary(row: UserRow): UserSummary {
     name: row.name,
     city: row.city,
     avatarUrl: row.image ?? null,
-    // The wire carries RFC 3339 strings, not `Date`s — see
-    // contracts/primitives.ts.
     createdAt: row.createdAt.toISOString(),
   };
 }

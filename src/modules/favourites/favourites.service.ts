@@ -6,21 +6,10 @@ import * as repo from "./favourites.repository.js";
 import type { FavouritesSetOutput, Pet, PaginationMeta } from "#contracts";
 import type { Executor } from "../../db/types.js";
 
-// Architecture §2.1 — service may import own repository and other
-// modules' `index.ts`, not Drizzle. Returns `ResultAsync<T, AppError>`.
-
 function paginationMeta(page: number, perPage: number, total: number): PaginationMeta {
   return { page, perPage, total, totalPages: total === 0 ? 0 : Math.ceil(total / perPage) };
 }
 
-/**
- * Contract §8.5 `favourites.set`. The pet must be visible to the caller
- * (same predicate `adoptionRequests.create` uses via `findVisiblePet`)
- * or this returns `not_found` — a stranger can't discover a hidden pet's
- * id just by favouriting it. The write itself is idempotent by
- * construction (R-18, composite PK) — no pre-check needed there. Echoes
- * the input back per contract.
- */
 export function set(
   db: Executor,
   callerId: string,
@@ -39,7 +28,6 @@ export function set(
   );
 }
 
-/** Contract §8.5 `favourites.list` — newest-favourited-first, any pet status. */
 export function list(
   db: Executor,
   callerId: string,

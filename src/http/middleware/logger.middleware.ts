@@ -1,12 +1,6 @@
 import { createRequestLogger, type Logger } from "../../lib/logger.js";
 import type { MiddlewareHandler } from "hono";
 
-/**
- * Builds a request-scoped pino child logger (carrying `requestId`) and
- * puts it on `c.var.logger`. Must run after `requestId()`. Also logs one
- * line per HTTP request on the way out (architecture §8): method, path,
- * status, ms.
- */
 export function loggerMiddleware(): MiddlewareHandler<{
   Variables: { requestId: string; logger: Logger };
 }> {

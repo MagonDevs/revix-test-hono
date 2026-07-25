@@ -8,14 +8,6 @@ import { startTestDb, withRollback, type TestDb } from "../../db/test/testcontai
 import * as service from "./favourites.service.js";
 import type { Transaction } from "../../db/types.js";
 
-// Architecture §9 — every rule in contract §9 gets a test that cites its
-// number. Docker required (Testcontainers Postgres).
-//
-// STATUS: not run in this sandbox — Testcontainers can't pull/start the
-// Postgres image within the 120s hook timeout here (network-restricted
-// sandbox, same ceiling B7 hit). Written to be correct and to run
-// unmodified via `pnpm test:integration` once Docker is available.
-
 let testDb: TestDb;
 
 async function insertUser(
@@ -179,10 +171,6 @@ describe("favourites.service (requires Docker)", () => {
         email: "bea5@example.com",
         city: "Madrid",
       });
-      // Favourite the pet while it is still visible (available) — a
-      // stranger cannot favourite a pet that is already adopted/withdrawn
-      // (R-2, contract §5.4). The point of this test is what happens
-      // *after* the favourite exists and the pet later transitions.
       await insertPet(tx, { id: petId, ownerId, status: "available" });
 
       const setResult = await service.set(tx, callerId, petId, true);
@@ -211,7 +199,6 @@ describe("favourites.service (requires Docker)", () => {
         city: "Madrid",
       });
 
-      // Three favourites, so with perPage 10 there is exactly one real page.
       for (let i = 0; i < 3; i += 1) {
         const petId = uuidv7();
         await insertPet(tx, { id: petId, ownerId });

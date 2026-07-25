@@ -10,13 +10,6 @@ import { parseParams, parseQuery } from "../lib/parse.js";
 import { json, noContent, unwrap } from "../lib/respond.js";
 import type { AppVariables } from "../context.js";
 
-// Contract §8.5 as REST. Favouriting is a membership, so it is modelled
-// as a resource under the caller: PUT adds, DELETE removes, and both are
-// idempotent (R-18) — repeating either is 204, never 409. Neither needs a
-// body: the verb *is* the new state.
-//
-// Every route is authenticated; there is no anonymous view of favourites.
-
 export function createFavouritesRoutes() {
   const app = new Hono<{ Variables: AppVariables }>();
 

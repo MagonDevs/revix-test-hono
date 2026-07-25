@@ -1,8 +1,6 @@
 import { at } from "../util.js";
 import type { Species } from "#contracts";
 
-// Spec §3 — curated per-species pet names, not raw faker output.
-
 export const NAMES_BY_SPECIES: Record<Species, string[]> = {
   dog: [
     "Nala",

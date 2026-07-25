@@ -5,11 +5,6 @@ import { pets } from "../../db/schema/pets.js";
 import type { Executor } from "../../db/types.js";
 import type { PetRow, ViewerFlags } from "../pets/index.js";
 
-// Drizzle-only, own module types, no business rules beyond query shape
-// (architecture §2.1). Composite PK on (user_id, pet_id) — data model
-// §5.2 — is what makes `set()` a plain upsert/delete, idempotent by
-// construction (R-18), no application-level idempotency logic needed.
-
 const guardianFields = {
   id: user.id,
   name: user.name,
@@ -41,11 +36,6 @@ const petFields = {
   updatedAt: pets.updatedAt,
 };
 
-/**
- * §8.5's `viewerRequestStatus` is still per-caller here even though
- * `isFavourited` is trivially `true` for every row — the caller may have
- * an active/past adoption request on a pet they favourited (R-20).
- */
 function viewerRequestStatusField(callerId: string) {
   return sql<string | null>`(
     select ar.status from adoption_requests ar
@@ -61,16 +51,6 @@ export interface PageResult<T> {
   total: number;
 }
 
-/**
- * Contract §8.5 `favourites.list` — "in any status" is deliberate (the
- * client still shows pets the caller favourited even after they're
- * adopted/withdrawn), so unlike `pets.list` there is no status filter
- * here. Ordered newest-favourited-first. Favourites IS the entity being
- * paginated with its pet attached, so this is a single join rather than
- * the id-then-fetch two-query shape — photos are still fetched in a
- * follow-up query by the caller (pets module's `findPhotosByPetIds`),
- * same no-N+1 discipline as B5.
- */
 export async function listPaginated(
   db: Executor,
   callerId: string,
@@ -103,12 +83,6 @@ export async function listPaginated(
   return { items, total };
 }
 
-/**
- * Exact count matching a favourites WHERE predicate. Counts the
- * `favourites` base entity only — no join to `pets`/`user`, and no
- * `viewerRequestStatus` correlated subquery (that belongs to the SELECT
- * list on the page query, not to a count).
- */
 async function countFavourites(db: Executor, where: SQL): Promise<number> {
   const [row] = await db
     .select({ count: sql<number>`count(*)`.mapWith(Number) })
@@ -117,12 +91,6 @@ async function countFavourites(db: Executor, where: SQL): Promise<number> {
   return row?.count ?? 0;
 }
 
-/**
- * R-18 — idempotent by construction via the composite PK: `true` is an
- * upsert that no-ops on conflict, `false` is a plain delete that no-ops
- * when the row doesn't exist. No read-before-write, no application-level
- * idempotency check.
- */
 export async function set(
   db: Executor,
   userId: string,

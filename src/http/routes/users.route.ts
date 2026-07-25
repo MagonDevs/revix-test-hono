@@ -11,12 +11,6 @@ import { parseBody, parseParams } from "../lib/parse.js";
 import { json, unwrap } from "../lib/respond.js";
 import type { AppVariables } from "../context.js";
 
-// Contract §8.2 as REST.
-//
-// `/users/me` is registered before `/users/:userId` on purpose: Hono
-// matches in registration order, so the literal path has to come first or
-// `me` would be swallowed as a user id and answer 400 on the uuid check.
-
 export function createUsersRoutes() {
   const app = new Hono<{ Variables: AppVariables }>();
 

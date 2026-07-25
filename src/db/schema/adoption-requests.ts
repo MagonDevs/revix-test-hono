@@ -25,7 +25,7 @@ export const adoptionRequests = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     guardianId: text("guardian_id")
       .notNull()
-      .references(() => user.id, { onDelete: "cascade" }), // denormalised from pets.ownerId — see data model §3
+      .references(() => user.id, { onDelete: "cascade" }),
     message: varchar("message", { length: 1000 }).notNull(),
     status: requestStatusEnum("status").notNull().default("pending"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),

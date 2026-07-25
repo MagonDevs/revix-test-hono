@@ -4,9 +4,6 @@ import type { AdoptionRequest, Pet as PetContract } from "#contracts";
 import type { PetPhotoRow } from "../pets/index.js";
 import type { UserRow } from "../users/index.js";
 
-// Pure rows -> contract output mapper (architecture §2.1).
-
-/** Shape of a row read from `adoption_requests`, joined with pet/adopter/guardian. */
 export interface AdoptionRequestRow {
   id: string;
   status: AdoptionRequest["status"];
@@ -22,14 +19,6 @@ export interface AdoptionRequestRow {
   guardian: UserRow;
 }
 
-/**
- * R-19 — `contact` holds the *counterparty's* email/phone, populated only
- * when `status === 'accepted'`, and only for the two parties. Driven purely
- * by the caller's id against the row's already-joined adopter/guardian
- * data — no extra query. Rows reach this mapper already scoped to the two
- * parties (repository visibility predicate), so a caller who is neither
- * simply never gets a row in the first place.
- */
 export function mapAdoptionRequest(
   row: AdoptionRequestRow,
   coverPhoto: PetPhotoRow | null,

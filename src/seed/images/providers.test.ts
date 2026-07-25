@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { avatarUrlFor, imageUrlFor, stableLock } from "./providers.js";
 
-// Spec §5.2 exact URL shapes, verified live against each provider
-// 2026-07-25 — see docs/notes/seed-images.md.
-
 describe("stableLock", () => {
   it("is deterministic per (species, index)", () => {
     expect(stableLock("dog", 3)).toBe(stableLock("dog", 3));

@@ -7,27 +7,10 @@ import type { Database } from "./client.js";
 
 const MIGRATIONS_FOLDER = new URL("./migrations", import.meta.url).pathname;
 
-/**
- * Applies all pending migrations. Usable both as a CLI entry point
- * (`pnpm db:migrate`) and, in spirit, as the release step that runs
- * before the app boots (architecture §8, §10 — migrations run as a
- * release step, never on boot from multiple replicas).
- */
 export async function runMigrations(db: Database): Promise<void> {
   await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
 }
 
-/**
- * Counts pending migrations without applying them. Building block for
- * the boot-time "assert no pending migrations" check (data model §6,
- * architecture §8). Actual wiring into app boot happens in B2 — this
- * function is the piece B1 owns.
- *
- * Drizzle doesn't expose a public "dry run" API, so this mirrors its
- * internal bookkeeping: it reads the migration journal, ensures the
- * `drizzle.__drizzle_migrations` table exists, and diffs applied hashes
- * against the journal's entries.
- */
 export async function countPendingMigrations(db: Database): Promise<number> {
   const journalUrl = new URL("./migrations/meta/_journal.json", import.meta.url);
   const { readFile } = await import("node:fs/promises");
@@ -53,11 +36,6 @@ export async function countPendingMigrations(db: Database): Promise<number> {
   return Math.max(totalMigrations - appliedCount, 0);
 }
 
-/**
- * Boot-time guard (data model §6: "The app checks for pending migrations
- * at boot and refuses to start if any exist"). Wiring this into
- * index.ts's boot sequence is B2's job; B1 delivers the check itself.
- */
 export async function assertNoPendingMigrations(db: Database): Promise<void> {
   const pending = await countPendingMigrations(db);
   if (pending > 0) {

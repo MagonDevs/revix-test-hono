@@ -6,14 +6,6 @@ import { startTestDb, withRollback, type TestDb } from "../../db/test/testcontai
 import * as service from "./users.service.js";
 import type { Transaction } from "../../db/types.js";
 
-// Architecture §9 — rule R-15 gets a test citing it. Docker required
-// (Testcontainers Postgres).
-//
-// STATUS: not run in this sandbox — Testcontainers can't pull/start the
-// Postgres image within the 120s hook timeout here (network-restricted
-// sandbox, same ceiling B7 hit). Written to be correct and to run
-// unmodified via `pnpm test:integration` once Docker is available.
-
 let testDb: TestDb;
 
 async function insertUser(

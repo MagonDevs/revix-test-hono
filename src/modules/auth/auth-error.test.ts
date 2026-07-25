@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normaliseBetterAuthError } from "./auth-error.js";
 
-// Contract §5.4/§7.1-7.2, R-21 — pure unit tests of the rewrite function,
-// no DB/Docker required. The function answers with an `AppError`; the HTTP
-// status and wire body are `http/lib/http-error.ts`'s job, tested there.
-
 describe("normaliseBetterAuthError", () => {
   it("rewrites a sign-up duplicate email into a duplicate_email conflict", () => {
     const result = normaliseBetterAuthError({
@@ -49,9 +45,6 @@ describe("normaliseBetterAuthError", () => {
     });
 
     expect(result.code).toBe("internal_error");
-    // The raw driver detail must not survive into the AppError's message —
-    // `toHttpErrorBody` also replaces an internal_error message wholesale,
-    // so this is belt-and-braces on the same rule (architecture §4).
     expect(JSON.stringify(result)).not.toMatch(/10\.0\.0\.5/);
   });
 });

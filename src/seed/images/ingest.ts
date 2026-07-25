@@ -6,14 +6,6 @@ import { generateOfflineImage } from "./offline.js";
 import type { Species } from "#contracts";
 import type { StoragePort } from "../../ports/storage.port.js";
 
-// Spec §5.1/§5.2 `ingest` mode: "Download once from a provider, run the
-// real sharp pipeline, write to storage, insert uploads rows. Cached in
-// .seed-cache/ so re-seeding is instant and offline."
-//
-// docs/notes/seed-images.md: providers must be fetched with GET (cataas
-// 404s on HEAD, picsum 405s), and redirects must be followed (loremflickr,
-// picsum both 302). `fetch` does both by default.
-
 const CACHE_DIR = new URL("../../../.seed-cache/", import.meta.url).pathname;
 const FETCH_TIMEOUT_MS = 6000;
 const MAX_RETRIES = 2;
@@ -54,7 +46,7 @@ async function fetchWithRetry(url: string): Promise<Uint8Array | null> {
       const buf = await res.arrayBuffer();
       return new Uint8Array(buf);
     } catch {
-      // fall through to retry / give up
+      continue;
     } finally {
       clearTimeout(timeout);
     }
@@ -67,16 +59,9 @@ export interface IngestResult {
   width: number;
   height: number;
   format: "webp";
-  /** Whether the pipeline fell through to an offline render for this image. */
   fellBackOffline: boolean;
 }
 
-/**
- * Downloads (or reads from cache) the image at `url`, runs it through
- * the real sharp normalise pipeline, and returns the processed bytes.
- * On network failure after retries, falls through to a locally
- * generated offline image instead of failing the whole seed.
- */
 export async function ingestImage(
   url: string,
   fallback: { name: string; species: Species; width: number; height: number },
@@ -116,7 +101,6 @@ export interface StoredUploadRow {
   createdAt: Date;
 }
 
-/** Writes normalised bytes to storage and returns the row shape for `uploads`. */
 export async function persistIngestedImage(
   storage: StoragePort,
   result: Pick<IngestResult, "bytes" | "width" | "height">,

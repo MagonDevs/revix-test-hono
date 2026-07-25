@@ -4,15 +4,10 @@ import { nameFor } from "../data/names.js";
 import { at } from "../util.js";
 import type { PetSize, PetStatus, Sex, Species } from "#contracts";
 
-/** Deterministic per-species breed pick, mirroring `meta.breeds`' source data. */
 function breedFor(species: Species, index: number): string {
   const list = BREEDS_BY_SPECIES[species];
   return at(list, index % list.length, "breed list");
 }
-
-// Direct-insert row shape for `pets` (db/schema/pets.ts). Unlike users,
-// pets/requests/favourites ARE fine as direct inserts — spec §2 only
-// singles out users because Better Auth owns the auth-table invariants.
 
 export interface PetRow {
   id: string;
@@ -38,7 +33,7 @@ export interface PetRow {
 export interface BuildPetInput {
   id: string;
   ownerId: string;
-  index: number; // deterministic index within species, drives name/breed/description
+  index: number;
   species: Species;
   breed?: string | null;
   sex: Sex;
@@ -53,9 +48,7 @@ export interface BuildPetInput {
   isNeutered?: boolean;
   isGoodWithKids?: boolean;
   isGoodWithPets?: boolean;
-  /** Override the composed description (used by the `edge` scenario for boundary lengths). */
   description?: string;
-  /** Override the name (used by the `edge` scenario for 2/40-char boundaries). */
   name?: string;
 }
 
@@ -93,18 +86,15 @@ export function buildPet(input: BuildPetInput): PetRow {
   };
 }
 
-/** Spec §5.3 — 1 photo (20%), 2-3 (55%), 4-6 (25%), picked from a unit interval. */
 export function photoCountFor(unitInterval: number): number {
   if (unitInterval < 0.2) return 1;
   if (unitInterval < 0.75) return unitInterval < 0.475 ? 2 : 3;
-  // remaining 25%, spread across 4-6
-  const t = (unitInterval - 0.75) / 0.25; // 0..1
+  const t = (unitInterval - 0.75) / 0.25;
   if (t < 1 / 3) return 4;
   if (t < 2 / 3) return 5;
   return 6;
 }
 
-/** Landscape/portrait alternate per spec §5.3, keyed off absolute photo position. */
 export function dimensionsFor(position: number): { width: number; height: number } {
   return position % 2 === 0 ? { width: 1200, height: 900 } : { width: 900, height: 1200 };
 }

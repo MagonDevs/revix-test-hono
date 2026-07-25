@@ -13,13 +13,6 @@ import { at } from "../util.js";
 import type { PetStatus, RequestStatus } from "#contracts";
 import type { ScenarioSummary, SeedContext } from "../context.js";
 
-// Spec §4 `edge` — every boundary from @adopta/contracts LIMITS: 2- and
-// 40-char names, 30- and 2000-char descriptions, ages 0 and 360, 1-photo
-// and 6-photo pets, a pet with every optional field null, one of every
-// pet status, one of every request status, a user with a 500-char bio
-// and no phone.
-
-/** Pads/truncates `base` to exactly `length` characters. */
 function exactLength(base: string, length: number): string {
   if (base.length >= length) return base.slice(0, length);
   return (base + " " + base.repeat(Math.ceil(length / base.length))).slice(0, length);
@@ -45,7 +38,6 @@ export async function seedEdge(ctx: SeedContext): Promise<ScenarioSummary> {
       city: "Madrid",
       phone: `+34 6${faker.string.numeric(8)}`,
     }),
-    // "a user with a 500-char bio and no phone"
     await createSeedUser(ctx.auth, ctx.db, {
       name: "Edge Bio User",
       email: "edge-bio@example.com",
@@ -95,7 +87,6 @@ export async function seedEdge(ctx: SeedContext): Promise<ScenarioSummary> {
     photoRows.push(...photos);
   };
 
-  // 2-char name, 30-char description, age 0, 1 photo.
   await addPet({
     id: ids.next(),
     ownerId: owner.id,
@@ -114,7 +105,6 @@ export async function seedEdge(ctx: SeedContext): Promise<ScenarioSummary> {
     photoCount: 1,
   });
 
-  // 40-char name, 2000-char description, age 360, 6 photos.
   await addPet({
     id: ids.next(),
     ownerId: owner.id,
@@ -133,7 +123,6 @@ export async function seedEdge(ctx: SeedContext): Promise<ScenarioSummary> {
     photoCount: 6,
   });
 
-  // Every optional field null: breed and weightGrams.
   await addPet({
     id: ids.next(),
     ownerId: owner.id,
@@ -150,7 +139,6 @@ export async function seedEdge(ctx: SeedContext): Promise<ScenarioSummary> {
     photoCount: 2,
   });
 
-  // One of every remaining pet status.
   for (const [i, status] of PET_STATUSES.entries()) {
     await addPet({
       id: ids.next(),
@@ -168,10 +156,6 @@ export async function seedEdge(ctx: SeedContext): Promise<ScenarioSummary> {
     });
   }
 
-  // One adoption request in every status. adoption_requests_active_uq
-  // forbids two active (pending/accepted) requests for the same
-  // (petId, adopterId) pair, so each status targets a different pet
-  // (the four PET_STATUSES pets added above cover exactly four pets).
   const statusPets = [
     at(petRows, 0, "petRows"),
     at(petRows, 3, "petRows"),

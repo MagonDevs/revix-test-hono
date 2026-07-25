@@ -10,27 +10,8 @@ import * as repo from "./pets.repository.js";
 import type { PetSize, PetStatus, Sex, Species } from "#contracts";
 import type { Transaction } from "../../db/types.js";
 
-// Architecture §9: integration tests build rows through the B4 seed
-// factories directly, inside a rolled-back transaction — never the demo
-// scenario. Requires a real Docker daemon (Testcontainers Postgres).
-//
-// STATUS: not run in this sandbox — `docker ps` fails
-// ("failed to connect to the docker API ... no such file or directory").
-// Written to be correct and to run unmodified in an environment with
-// Docker available, via `pnpm test:integration`.
-
 let testDb: TestDb;
 
-/**
- * Users are normally created through Better Auth (spec §2), but the
- * repository under test never touches auth invariants (password hash,
- * account row) — only `user.id/name/email/image/city/phone/bio/
- * createdAt` are read (as the `guardian` join). A direct insert is
- * therefore fine here and keeps this suite independent of Better Auth's
- * config, per architecture §9's "seed factories, not the demo scenario"
- * guidance (factories build rows; they don't mandate the auth API
- * specifically outside the seeder itself).
- */
 async function insertUser(
   tx: Transaction,
   input: { id: string; name: string; email: string; city: string },
@@ -81,7 +62,6 @@ describe("pets.repository (requires Docker)", () => {
     await testDb?.teardown();
   });
 
-  // R-1 — public lists never include adopted/withdrawn, even for the owner
   it("listPaginated excludes adopted and withdrawn, even for the owner", async () => {
     await withRollback(testDb.db, async (tx) => {
       const owner = "owner-1";
@@ -142,7 +122,6 @@ describe("pets.repository (requires Docker)", () => {
     });
   });
 
-  // Each filter alone and in combination
   it("filters by species, size, sex, ageGroup, city, q — alone and combined", async () => {
     await withRollback(testDb.db, async (tx) => {
       const owner = "owner-2";
@@ -161,7 +140,7 @@ describe("pets.repository (requires Docker)", () => {
           species: "dog",
           size: "small",
           sex: "male",
-          ageMonths: 2, // baby
+          ageMonths: 2,
           city: "Madrid",
           createdAt: base,
           name: "Zephyr",
@@ -173,7 +152,7 @@ describe("pets.repository (requires Docker)", () => {
           species: "cat",
           size: "large",
           sex: "female",
-          ageMonths: 100, // senior
+          ageMonths: 100,
           city: "Barcelona",
           createdAt: base,
           name: "Whiskers",
@@ -298,7 +277,6 @@ describe("pets.repository (requires Docker)", () => {
         city: "Madrid",
       });
       const sameTime = new Date("2026-01-01T00:00:00Z");
-      // ids chosen so string-sort order is deterministic and known
       const rows = [
         pet({
           id: "0198f7b0-0003-7000-8000-000000000003",
@@ -350,7 +328,6 @@ describe("pets.repository (requires Docker)", () => {
         perPage: 12,
         viewerId: null,
       });
-      // two "Alpha" rows tie-break by id ascending, then "Bravo"
       expect(nameAsc.items.map((p) => p.id)).toEqual([
         "0198f7b0-0003-7000-8000-000000000001",
         "0198f7b0-0003-7000-8000-000000000002",
@@ -359,7 +336,6 @@ describe("pets.repository (requires Docker)", () => {
     });
   });
 
-  // R-2 — pets.byId: stranger gets not_found for withdrawn/adopted, owner sees any status
   it("findById: stranger cannot see withdrawn/adopted; owner can", async () => {
     await withRollback(testDb.db, async (tx) => {
       const owner = "owner-5";
@@ -398,7 +374,6 @@ describe("pets.repository (requires Docker)", () => {
     });
   });
 
-  // R-3 — listByOwner returns available only
   it("listByOwnerPaginated returns available pets only, regardless of caller", async () => {
     await withRollback(testDb.db, async (tx) => {
       const owner = "owner-6";
@@ -441,7 +416,6 @@ describe("pets.repository (requires Docker)", () => {
     });
   });
 
-  // R-20 — isFavourited/viewerRequestStatus correct per caller, never leak
   it("isFavourited and viewerRequestStatus are per-caller and never leak", async () => {
     await withRollback(testDb.db, async (tx) => {
       const owner = "owner-7";
@@ -464,7 +438,6 @@ describe("pets.repository (requires Docker)", () => {
       const petId = "0198f7b0-0006-7000-8000-000000000001";
       await tx.insert(pets).values(pet({ id: petId, ownerId: owner, index: 0, createdAt: base }));
 
-      // Alice favourites the pet and has a pending request; Bob has neither.
       await tx.insert(favourites).values(buildFavourite(alice, petId, base));
       await tx.insert(adoptionRequests).values(
         buildAdoptionRequest({
@@ -521,7 +494,6 @@ describe("pets.repository (requires Docker)", () => {
           height: 600,
         })),
       );
-      // insert out of order to prove ordering comes from position, not insert order
       await tx.insert(petPhotos).values([
         {
           id: "0198f7b0-0007-7000-8000-000000000021",

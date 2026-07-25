@@ -2,9 +2,6 @@ import { describe, expect, it } from "vitest";
 import { mapSessionUser, mapUserProfile, mapUserSummary } from "./users.mapper.js";
 import type { UserRow } from "./users.mapper.js";
 
-// R-22 — email/phone appear only on SessionUser, never on
-// UserSummary/UserProfile.
-
 const row: UserRow = {
   id: "user-1",
   name: "Ana",

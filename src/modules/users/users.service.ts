@@ -8,8 +8,6 @@ import type { SessionUser, UserProfile, UsersUpdateMeInput } from "#contracts";
 import type { UserUpdatePatch } from "./users.repository.js";
 import type { Executor } from "../../db/types.js";
 
-// Architecture §6 — services return `ResultAsync<T, AppError>`.
-
 class UserNotFound extends Error {}
 
 export function getUserProfile(db: Executor, userId: string): ResultAsync<UserProfile, AppError> {
@@ -24,16 +22,6 @@ export function getUserProfile(db: Executor, userId: string): ResultAsync<UserPr
   );
 }
 
-/**
- * `undefined` (field omitted from input) means "unchanged"; explicit
- * `null` means "clear it" — contract §8.2. `avatarUploadId`: R-15 — a
- * non-null id must be owned by the caller (checked via the uploads
- * module's public API, same cross-module pattern B6 used for pet
- * photos), and resolves to the upload's public URL, the same
- * `/api/v1/uploads/<id>/raw` shape `uploads.service.toUploadOutput` uses.
- * Unlike pet photos, an avatar isn't tracked by `consumedAt` — reusing
- * or re-setting an upload here never errors.
- */
 export function updateMe(
   db: Executor,
   userId: string,

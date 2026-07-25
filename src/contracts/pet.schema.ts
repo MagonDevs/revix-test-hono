@@ -13,17 +13,15 @@ import { paginatedSchema, paginationQuerySchema } from "./pagination.js";
 import { idSchema, isoDateTimeSchema, repeatable } from "./primitives.js";
 import { userSummarySchema } from "./user.schema.js";
 
-// §6.4 — PetPhoto. Array order is meaningful; index 0 is the cover photo.
 export const petPhotoSchema = z.object({
   id: idSchema,
-  url: z.string(), // e.g. '/api/v1/uploads/<uploadId>/raw'
+  url: z.string(),
   alt: z.string().nullable(),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
 });
 export type PetPhoto = z.infer<typeof petPhotoSchema>;
 
-// §6.5 — Pet
 export const petSchema = z.object({
   id: idSchema,
   name: z.string(),
@@ -49,28 +47,14 @@ export const petSchema = z.object({
 });
 export type Pet = z.infer<typeof petSchema>;
 
-// §6.6 — OwnedPet, only ever returned from GET /me/pets.
 export const ownedPetSchema = petSchema.extend({
   pendingRequestCount: z.number().int().nonnegative(),
 });
 export type OwnedPet = z.infer<typeof ownedPetSchema>;
 
-// ---------------------------------------------------------------------------
-// Path params
-// ---------------------------------------------------------------------------
-
 export const petIdParamsSchema = z.object({ petId: idSchema });
 export type PetIdParams = z.infer<typeof petIdParamsSchema>;
 
-// ---------------------------------------------------------------------------
-// Query strings
-// ---------------------------------------------------------------------------
-//
-// Every value arrives as a string, so scalars coerce; `species`/`size`
-// additionally accept the repeated-parameter form (`?species=dog&species=cat`),
-// which is what the client emits for a multi-select filter.
-
-// GET /pets
 export const petsListQuerySchema = z.object({
   q: z.string().trim().min(1).max(LIMITS.list.searchMax).optional(),
   species: repeatable(speciesSchema).pipe(z.array(speciesSchema).min(1).max(5)).optional(),
@@ -84,12 +68,10 @@ export const petsListQuerySchema = z.object({
 export type PetsListInput = z.infer<typeof petsListQuerySchema>;
 export const petsListOutputSchema = paginatedSchema(petSchema);
 
-// GET /users/:userId/pets — pagination only; the owner comes from the path.
 export const petsListByOwnerQuerySchema = paginationQuerySchema;
 export type PetsListByOwnerInput = { ownerId: string } & z.infer<typeof petsListByOwnerQuerySchema>;
 export const petsListByOwnerOutputSchema = paginatedSchema(petSchema);
 
-// GET /me/pets
 export const petsListMineQuerySchema = z.object({
   status: petStatusSchema.optional(),
   sort: petSortSchema.default("newest"),
@@ -98,17 +80,12 @@ export const petsListMineQuerySchema = z.object({
 export type PetsListMineInput = z.infer<typeof petsListMineQuerySchema>;
 export const petsListMineOutputSchema = paginatedSchema(ownedPetSchema);
 
-// ---------------------------------------------------------------------------
-// Request bodies
-// ---------------------------------------------------------------------------
-
 export const petPhotoInputSchema = z.strictObject({
   uploadId: idSchema,
   alt: z.string().max(LIMITS.pet.altMax).nullable().optional(),
 });
 export type PetPhotoInput = z.infer<typeof petPhotoInputSchema>;
 
-// POST /pets
 export const createPetRequestSchema = z.strictObject({
   name: z.string().trim().min(LIMITS.pet.nameMin).max(LIMITS.pet.nameMax),
   species: speciesSchema,
@@ -133,8 +110,6 @@ export const createPetRequestSchema = z.strictObject({
 });
 export type CreatePetInput = z.infer<typeof createPetRequestSchema>;
 
-// PATCH /pets/:petId — any subset of the create fields, at least one of
-// them. The pet id lives in the path and is never accepted in the body.
 export const updatePetRequestSchema = createPetRequestSchema
   .partial()
   .refine((v) => Object.keys(v).length > 0, {
@@ -142,15 +117,12 @@ export const updatePetRequestSchema = createPetRequestSchema
   });
 export type UpdatePetRequest = z.infer<typeof updatePetRequestSchema>;
 
-/** What `pets.service.update` consumes: the path id merged into the body. */
 export type PetsUpdateInput = { petId: string } & UpdatePetRequest;
 
-// PATCH /pets/:petId/status
 export const updatePetStatusRequestSchema = z.strictObject({
   status: petStatusSchema,
   declinePendingRequests: z.boolean().default(true),
 });
 export type UpdatePetStatusRequest = z.infer<typeof updatePetStatusRequestSchema>;
 
-/** What `pets.service.setStatus` consumes: the path id merged into the body. */
 export type PetsSetStatusInput = { petId: string } & UpdatePetStatusRequest;

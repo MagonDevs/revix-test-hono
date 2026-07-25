@@ -16,15 +16,7 @@ import type { AdoptionRequestRow } from "./adoption-requests.mapper.js";
 import type { Database, Executor } from "../../db/types.js";
 import type { IdPort } from "../../ports/id.port.js";
 
-// Architecture §2.1 — service may import own repository/mapper, other
-// modules' `index.ts`, and `ports`, not Drizzle or `adapters`. `idPort` is a
-// module-level default (see `modules/pets/pets.service.ts` for the same
-// pattern) rather than `new Uuidv7IdAdapter()`, so this file never imports
-// `src/adapters`.
 const idPort: IdPort = { next: () => uuidv7() };
-
-// Architecture §2.1 — service may import own repository/mapper and other
-// modules' `index.ts`, not Drizzle. Returns `ResultAsync<T, AppError>`.
 
 function paginationMeta(page: number, perPage: number, total: number): PaginationMeta {
   return { page, perPage, total, totalPages: total === 0 ? 0 : Math.ceil(total / perPage) };
@@ -39,14 +31,6 @@ async function toContract(
   return mapAdoptionRequest(row, coverPhotos.get(row.pet.id) ?? null, callerId);
 }
 
-/**
- * Contract §8.4 `adoptionRequests.create`. Order of checks matches the
- * contract's table exactly: visibility (via `pets/index.ts`, R-2's own
- * predicate — a pet not visible comes back `not_found`), then R-7
- * (self-request), then R-8 (duplicate active request — declined/withdrawn
- * do NOT block), then R-9 (pet adopted/withdrawn). All pure reads, so no
- * transaction is needed until the insert itself.
- */
 export function create(
   db: Database,
   callerId: string,
@@ -73,19 +57,6 @@ export function create(
         );
       }
 
-      // NOTE: this branch is currently unreachable. `findVisiblePet` above
-      // already applies R-2's visibility predicate (available/reserved OR
-      // owner), so an adopted/withdrawn pet only reaches this line for its
-      // owner — and the owner was already rejected above by the
-      // self_request check (R-7). Every other caller hits `not_found`
-      // before getting here. This is intentional: contract §5.4/R-2's
-      // 404-over-403 rule explicitly names "a withdrawn or adopted pet
-      // requested by a stranger" as a not_found case, and that security
-      // property (don't leak the existence/state of an invisible record)
-      // outranks §8.4's R-9 table entry, which is unreachable as written.
-      // Left in place, not deleted, in case visibility rules ever change
-      // and make it reachable. See CHANGELOG.md and
-      // docs/notes/architecture-divergences.md.
       if (pet.status === "adopted" || pet.status === "withdrawn") {
         throw new DomainThrow(AppErrors.conflict("pet_unavailable", "This pet is not available"));
       }
@@ -110,7 +81,6 @@ export function create(
   );
 }
 
-/** Contract §8.4 `adoptionRequests.list` — role-scoped (no default), R-10 ordering. */
 export function list(
   db: Executor,
   callerId: string,
@@ -141,7 +111,6 @@ export function list(
   );
 }
 
-/** Contract §8.4 `adoptionRequests.byId` — R-11: non-parties get `not_found`, via query scoping. */
 export function byId(
   db: Executor,
   callerId: string,
@@ -157,19 +126,6 @@ export function byId(
   );
 }
 
-/**
- * Contract §8.4 `adoptionRequests.respond`. THE concurrency-critical
- * procedure (R-12/R-13, architecture §6). `findByIdForUpdate` takes a
- * row lock inside the transaction, so two simultaneous calls serialize:
- * the first to commit wins, the second observes `status !== 'pending'`
- * and fails with `request_already_answered` — never both winning.
- *
- * R-13: `reservePet` moves the pet to `reserved` in the SAME transaction,
- * via `pets/index.ts`'s tx-aware `setPetStatusInTx` (the repository-level
- * write, not `pets.service.setStatus`, which owns its own transaction
- * boundary and can't be nested here). An illegal transition throws and
- * rolls back the whole operation, including the request's status write.
- */
 export function respond(
   db: Database,
   callerId: string,
@@ -225,7 +181,6 @@ export function respond(
   );
 }
 
-/** Contract §8.4 `adoptionRequests.withdraw` — caller must be the adopter, only from `pending`. */
 export function withdraw(
   db: Database,
   callerId: string,

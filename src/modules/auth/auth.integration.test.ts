@@ -3,23 +3,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runMigrations } from "../../db/migrate.js";
 import type { ApiErrorBody, SessionUser } from "#contracts";
 
-// Architecture §5 / contract §7.1-7.3 — B3 integration coverage of the
-// REST auth facade (`/api/v1/auth/*`), which wraps Better Auth:
-//   - register creates a Better Auth user + account row
-//   - a duplicate email surfaces as the contract's conflict, not Better
-//     Auth's own 422 shape
-//   - login sets a session cookie that a later request is authenticated by
-//
-// Requires a real Docker daemon (Testcontainers Postgres). Same pattern
-// as db/test/testcontainers-setup.integration.test.ts (B1): excluded
-// from `pnpm test` by filename, run only via `pnpm test:integration`.
-//
-// NOTE: `auth.config.ts`, `db/client.ts` and `http/app.ts` build their
-// singletons from the parsed `env` at import time, so this test sets
-// `DATABASE_URL` etc. to the container's connection string and then
-// dynamically imports those modules — they must not be imported
-// (directly or transitively) anywhere above this point in the file.
-
 let container: StartedPostgreSqlContainer;
 
 const AUTH = "/api/v1/auth";
@@ -47,10 +30,6 @@ describe("REST auth facade — register / login / session (requires Docker)", ()
   }, 120_000);
 
   afterAll(async () => {
-    // Drain the pool before killing the container. Otherwise Postgres
-    // terminates the still-open connections on shutdown and `pg` raises
-    // that as an unhandled error outside any test, failing the run even
-    // though every assertion passed.
     const { closeDb } = await import("../../db/client.js");
     await closeDb();
     await container?.stop();
@@ -75,9 +54,6 @@ describe("REST auth facade — register / login / session (requires Docker)", ()
 
     expect(res.status).toBe(201);
 
-    // The response is the contract's SessionUser, not Better Auth's own
-    // user object — `availablePetCount` is the tell, and email/phone are
-    // present here (and only here, per R-22).
     const body = (await res.json()) as SessionUser;
     expect(body).toMatchObject({
       name: "Ana Garcia",
@@ -90,8 +66,6 @@ describe("REST auth facade — register / login / session (requires Docker)", ()
     expect(userRows).toHaveLength(1);
     const createdUser = userRows[0];
     expect(createdUser).toBeDefined();
-    // The contract types every id as a UUID, including auth-owned rows —
-    // see `advanced.database.generateId` in auth.config.ts.
     expect(createdUser?.id).toMatch(/^[0-9a-f-]{36}$/i);
 
     const accountRows = await db
@@ -153,8 +127,6 @@ describe("REST auth facade — register / login / session (requires Docker)", ()
     const setCookie = res.headers.get("set-cookie");
     expect(setCookie).toMatch(/adopta\.session_token/);
 
-    // The whole point of the cookie: the next request is authenticated by
-    // it, with no bearer token or manual plumbing on the client's side.
     const session = await app.request(`${AUTH}/session`, {
       headers: { cookie: setCookie ?? "" },
     });

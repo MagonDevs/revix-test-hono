@@ -3,11 +3,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startTestDb, withRollback, type TestDb } from "./testcontainers-setup.js";
 import type { Transaction } from "../types.js";
 
-// Smoke test for the harness itself (build plan B1 item 11): start a
-// real Postgres container, apply migrations, run a trivial query, roll
-// back a transaction. Requires Docker. Run via `pnpm test:integration`;
-// excluded from the default `pnpm test` run.
-
 let testDb: TestDb;
 
 describe("testcontainers harness", () => {

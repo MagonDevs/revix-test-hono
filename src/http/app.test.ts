@@ -2,12 +2,6 @@ import { describe, expect, it } from "vitest";
 import { API_PREFIX, app } from "./app.js";
 import type { ApiErrorBody } from "#contracts";
 
-// Contract §2, §5, §7.6 — the cross-cutting HTTP behaviour every endpoint
-// inherits, exercised via `app.request()`. Deliberately limited to the
-// paths that answer before touching the database (routing, parsing, the
-// auth boundary), so this file needs no Docker; anything that reads a row
-// is covered by the `*.integration.test.ts` suites.
-
 describe("GET /health", () => {
   it("returns 200 (liveness)", async () => {
     const res = await app.request("/health");

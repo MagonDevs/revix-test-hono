@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { speciesSchema } from "./enums.js";
 
-// GET /meta/breeds?species=<species>
 export const metaBreedsQuerySchema = z.object({
   species: speciesSchema,
 });

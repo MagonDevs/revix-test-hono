@@ -1,7 +1,3 @@
-// §4 — Constraints. Every limit in the system, in one place. All
-// validation elsewhere references these constants; no schema contains an
-// inline number.
-
 export const LIMITS = {
   user: {
     nameMin: 2,

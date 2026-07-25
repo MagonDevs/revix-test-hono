@@ -12,16 +12,9 @@ import type { IdPort } from "../../ports/id.port.js";
 import type { ImagePort } from "../../ports/image.port.js";
 import type { StoragePort } from "../../ports/storage.port.js";
 
-// Architecture §7 — the upload pipeline. HTTP-only (contract §7.4-7.5):
-// `http/routes/uploads.route.ts` is the thin transport wrapper; the
-// pipeline itself (size guard, sniffing, normalise, store, insert) lives
-// here so it stays testable without an HTTP request. `idPort` is a
-// module-level default (see `modules/pets/pets.service.ts`) rather than
-// `new Uuidv7IdAdapter()`, so this file never imports `src/adapters`.
 const idPort: IdPort = { next: () => uuidv7() };
 const MAX_EDGE_PX = 1600;
 
-/** Pure — testable without I/O. */
 export function checkSize(byteSize: number): AppError | null {
   if (byteSize > LIMITS.upload.maxBytes) {
     return AppErrors.invalidField("file", `File exceeds the ${LIMITS.upload.maxBytes} byte limit`);
@@ -29,11 +22,6 @@ export function checkSize(byteSize: number): AppError | null {
   return null;
 }
 
-/**
- * Sniffs the real type from the leading bytes via `file-type` — the
- * declared MIME type and filename are untrusted input (architecture §7
- * step 4).
- */
 export async function sniffMime(bytes: Uint8Array): Promise<string | undefined> {
   const detected = await fileTypeFromBuffer(bytes);
   return detected?.mime;
@@ -43,7 +31,6 @@ export function isAllowedMime(mime: string | undefined): boolean {
   return mime !== undefined && (LIMITS.upload.mimeTypes as readonly string[]).includes(mime);
 }
 
-/** `uploads/<yyyy>/<mm>/<uuid>.webp` — no part of the key comes from user input. */
 function storageKeyFor(id: string, now: Date): string {
   const yyyy = now.getUTCFullYear();
   const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
@@ -66,12 +53,6 @@ export interface CreateUploadDeps {
   now: () => Date;
 }
 
-/**
- * Full pipeline (architecture §7 steps 4-8): sniff -> sharp normalise ->
- * StoragePort.put -> insert. The size guard and rate limit (steps 2-3)
- * are the HTTP route's job — they need the request/session, not just
- * bytes.
- */
 export function createUpload(
   db: Executor,
   deps: CreateUploadDeps,
@@ -121,14 +102,6 @@ export async function getUploadBytes(
   return { bytes, mimeType: row.mimeType };
 }
 
-/**
- * Cross-module entry point for `modules/pets` (architecture §6.1 — calls
- * a function exported from the module's `index.ts`, passing the
- * transaction, never the repository directly). Returns the subset of
- * `uploadIds` that ARE owned by `callerId` and unconsumed; the caller
- * (pets.service) is responsible for turning any missing id into a
- * `photos[i].uploadId` field error (R-14, R-15).
- */
 export function verifyOwnedUnconsumed(
   db: Executor,
   uploadIds: string[],
@@ -147,12 +120,6 @@ export function consumeUploads(db: Executor, uploadIds: string[], when: Date): P
   return repo.markConsumed(db, uploadIds, when);
 }
 
-/**
- * Cross-module entry point for `modules/users` (R-15, contract §8.2):
- * an avatar upload need only be owned by the caller — unlike pet
- * photos it isn't tracked by `consumedAt`, so re-setting the same
- * avatar (or one already used elsewhere) is not rejected.
- */
 export function verifyOwned(
   db: Executor,
   uploadId: string,

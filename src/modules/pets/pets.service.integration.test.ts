@@ -11,13 +11,6 @@ import { buildAdoptionRequest } from "../../seed/factories/request.factory.js";
 import * as service from "./pets.service.js";
 import type { Database, Transaction } from "../../db/types.js";
 
-// Architecture §9 — every rule in contract §9 gets a test that cites its
-// number. Docker required (Testcontainers Postgres).
-//
-// STATUS: not run in this sandbox — `docker ps` fails ("... no such
-// file or directory"). Written to be correct and to run unmodified via
-// `pnpm test:integration` once Docker is available.
-
 let testDb: TestDb;
 
 async function insertUser(
@@ -431,7 +424,6 @@ describe("pets.service (requires Docker)", () => {
       expect(remainingRequests).toHaveLength(0);
       expect(remainingFavourites).toHaveLength(0);
 
-      // The upload row itself survives (sweeper cleans it up later).
       const [uploadRow] = await tx.select().from(uploads).where(eq(uploads.id, uploadId));
       expect(uploadRow).toBeDefined();
     });

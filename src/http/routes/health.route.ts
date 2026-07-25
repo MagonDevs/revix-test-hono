@@ -2,10 +2,6 @@ import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import type { Database } from "../../db/types.js";
 
-// Contract §7.6 — /health is liveness (200 if the process is up); /ready
-// pings the database and returns 503 while it cannot serve. Kept
-// distinct: a rolling deploy depends on it.
-
 export function createHealthRoutes(db: Database): Hono {
   const health = new Hono();
 

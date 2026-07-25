@@ -1,14 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { IdSequence, SEED_EPOCH, resetRng, seededDate, seededId } from "./rng.js";
 
-// Spec §6: "A test seeds two fresh databases and asserts the row sets
-// are identical." The Testcontainers half of that is
-// db/test/testcontainers-setup.integration.test.ts-style and gated on a
-// live Docker daemon (see docs/notes for the caveat). This file covers
-// the pure, no-DB half: the same offset/day always yields the same
-// output, which is the property that makes the DB-level assertion true
-// in the first place.
-
 describe("seededId", () => {
   it("is a pure function of offsetMs", () => {
     expect(seededId(0)).toBe(seededId(0));
@@ -26,7 +18,7 @@ describe("seededId", () => {
 
   it("is monotonically sortable by offset", () => {
     const a = seededId(0);
-    const b = seededId(1000 * 60 * 60); // 1 hour later
+    const b = seededId(1000 * 60 * 60);
     expect(a < b).toBe(true);
   });
 

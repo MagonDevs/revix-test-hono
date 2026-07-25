@@ -14,11 +14,6 @@ import { at } from "../util.js";
 import type { PetSize, PetStatus, RequestStatus, Sex, Species } from "#contracts";
 import type { ScenarioSummary, SeedContext } from "../context.js";
 
-// Spec §4 `large` — 5,000 pets, 200 users, 20,000 requests, images
-// always in `offline` mode (index verification, EXPLAIN plans, proving
-// deep pagination is still fast — none of that needs real bytes, and
-// offline is the only mode with zero network cost at this volume).
-
 const SPECIES_CYCLE: Species[] = ["dog", "cat", "rabbit", "bird", "other"];
 const SEX_CYCLE: Sex[] = ["male", "female", "unknown"];
 const SIZE_CYCLE: PetSize[] = ["small", "medium", "large"];
@@ -76,9 +71,6 @@ export async function seedLarge(ctx: SeedContext): Promise<ScenarioSummary> {
       sex: at(SEX_CYCLE, i % SEX_CYCLE.length, "SEX_CYCLE"),
       ageMonths: i % 200,
       size: at(SIZE_CYCLE, i % SIZE_CYCLE.length, "SIZE_CYCLE"),
-      // Contract §4: weightKg is validated to one decimal place, i.e.
-      // weight_grams must be a whole multiple of 100. Quantise to the
-      // nearest 100g while preserving the deterministic spread.
       weightGrams: Math.round((1000 + ((i * 517) % 50000)) / 100) * 100,
       city,
       status,
@@ -102,16 +94,12 @@ export async function seedLarge(ctx: SeedContext): Promise<ScenarioSummary> {
     photoRows.push(...photos);
   }
 
-  // adoption_requests_active_uq forbids more than one pending/accepted
-  // request for the same (petId, adopterId) pair — track pairs already
-  // "active" and fall back to a resolved status (declined/withdrawn,
-  // exempt from the constraint) for later collisions on the same pair.
   const activePairs = new Set<string>();
   const requestRows: AdoptionRequestRow[] = [];
   for (let i = 0; i < REQUEST_COUNT; i++) {
     const pet = at(petRows, i % petRows.length, "petRows");
     const adopter = at(users, (i + 1) % users.length, "users");
-    if (adopter.id === pet.ownerId) continue; // keep the no-self-request invariant
+    if (adopter.id === pet.ownerId) continue;
 
     let status = at(REQUEST_STATUS_CYCLE, i % REQUEST_STATUS_CYCLE.length, "REQUEST_STATUS_CYCLE");
     const pairKey = `${pet.id}:${adopter.id}`;

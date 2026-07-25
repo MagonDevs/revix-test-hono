@@ -1,10 +1,5 @@
 import { at } from "../util.js";
 
-// Spec §3 — composed prose, not `faker.lorem.paragraph()`. Four sentence
-// fragments, template-substituted with {name}/{city}, always landing
-// between 180 and 600 characters (inside LIMITS.pet.description
-// 30..2000, but long enough to exercise line clamping in the client).
-
 const openers = [
   "{name} came to us from a rescue in {city} last spring.",
   "We found {name} on a roadside near {city} and have been fostering since.",
@@ -45,12 +40,6 @@ function fill(template: string, name: string, city: string): string {
   return template.replaceAll("{name}", name).replaceAll("{city}", city);
 }
 
-/**
- * Composes a description from curated fragments using four independent
- * indices (so callers can derive each from a seeded source without the
- * fragments always pairing up together). Always 180–600 chars given the
- * fragment lengths above.
- */
 export function composeDescription(
   name: string,
   city: string,
@@ -65,8 +54,6 @@ export function composeDescription(
   const text = sentences.join(" ");
 
   if (text.length < 180 || text.length > 600) {
-    // Defensive: with the fragment lengths above this should never
-    // trigger, but fail loudly rather than seed out-of-contract data.
     throw new Error(`composeDescription produced ${text.length} chars, expected 180-600`);
   }
 

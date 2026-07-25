@@ -34,18 +34,27 @@ export const conflictReasonSchema = z.enum([
 ]);
 export type ConflictReason = z.infer<typeof conflictReasonSchema>;
 
-// §5.3 — Error data shape.
+// §5.3 — Error body shape. Every non-2xx response from every endpoint
+// carries exactly this, so a client has one error branch rather than one
+// per transport. The HTTP status and `code` always agree (see
+// `http/lib/http-error.ts` for the mapping), and the status is the
+// authoritative signal — `code` exists so a client can branch without
+// re-deriving meaning from a number.
 export const fieldErrorSchema = z.object({
   field: z.string(), // dot/bracket path: 'name', 'photos[0].uploadId'
   message: z.string(),
 });
 export type FieldError = z.infer<typeof fieldErrorSchema>;
 
-export const errorDataSchema = z.object({
-  appCode: appErrorCodeSchema,
-  conflictReason: conflictReasonSchema.optional(), // present iff appCode === 'conflict'
-  fieldErrors: z.array(fieldErrorSchema).optional(), // present iff appCode === 'validation_error'
-  retryAfterSeconds: z.number().optional(), // present iff appCode === 'rate_limited'
-  requestId: z.string(), // always
+export const apiErrorSchema = z.object({
+  code: appErrorCodeSchema, // always
+  message: z.string(), // always; safe to show, never carries internal detail
+  details: z.array(fieldErrorSchema).optional(), // present iff code === 'validation_error'
+  conflictReason: conflictReasonSchema.optional(), // present iff code === 'conflict'
+  retryAfterSeconds: z.number().optional(), // present iff code === 'rate_limited'
+  requestId: z.string(), // always; correlates with the server log line
 });
-export type ErrorData = z.infer<typeof errorDataSchema>;
+export type ApiError = z.infer<typeof apiErrorSchema>;
+
+export const apiErrorBodySchema = z.object({ error: apiErrorSchema });
+export type ApiErrorBody = z.infer<typeof apiErrorBodySchema>;

@@ -1,13 +1,14 @@
 import { z } from "zod";
 import { LIMITS } from "./constraints.js";
+import { idSchema, isoDateTimeSchema } from "./primitives.js";
 
 // §6.1 — UserSummary, embedded wherever a user appears.
 export const userSummarySchema = z.object({
-  id: z.string(),
+  id: idSchema,
   name: z.string(),
   city: z.string(),
   avatarUrl: z.string().nullable(),
-  createdAt: z.date(),
+  createdAt: isoDateTimeSchema,
 });
 export type UserSummary = z.infer<typeof userSummarySchema>;
 
@@ -26,20 +27,25 @@ export const sessionUserSchema = userProfileSchema.extend({
 });
 export type SessionUser = z.infer<typeof sessionUserSchema>;
 
-// §8.2 — users.byId
-export const usersByIdInputSchema = z.strictObject({
-  userId: z.string(),
+// GET /users/:userId — path params.
+export const usersByIdParamsSchema = z.object({
+  userId: idSchema,
 });
-export type UsersByIdInput = z.infer<typeof usersByIdInputSchema>;
+export type UsersByIdParams = z.infer<typeof usersByIdParamsSchema>;
 
-// §8.2 — users.updateMe
+// PATCH /users/me — request body.
+//
+// `avatarUploadId`, not `avatarUrl`: the caller names an upload it owns
+// and the server resolves the public URL itself (R-15). Accepting a URL
+// would let any caller point its avatar at an arbitrary string, so the
+// id — the thing that can be ownership-checked — is the input.
 export const usersUpdateMeInputSchema = z
   .strictObject({
     name: z.string().min(LIMITS.user.nameMin).max(LIMITS.user.nameMax).optional(),
     city: z.string().min(LIMITS.user.cityMin).max(LIMITS.user.cityMax).optional(),
     phone: z.string().max(LIMITS.user.phoneMax).nullable().optional(),
     bio: z.string().max(LIMITS.user.bioMax).nullable().optional(),
-    avatarUploadId: z.uuid().nullable().optional(),
+    avatarUploadId: idSchema.nullable().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, {
     message: "At least one field is required",

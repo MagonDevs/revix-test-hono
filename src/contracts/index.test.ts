@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   AGE_GROUP_MONTHS,
   LIMITS,
-  authSignUpInputSchema,
-  createPetInputSchema,
+  createPetRequestSchema,
   paginatedSchema,
   petSchema,
-  petsListInputSchema,
+  petsListQuerySchema,
+  registerRequestSchema,
   sessionUserSchema,
   speciesSchema,
 } from "./index.js";
@@ -42,21 +42,34 @@ describe("pagination", () => {
   });
 });
 
-describe("pets.list input", () => {
+describe("GET /pets query", () => {
   it("applies defaults for sort/page/perPage", () => {
-    const parsed = petsListInputSchema.parse({});
+    const parsed = petsListQuerySchema.parse({});
     expect(parsed).toMatchObject({ sort: "newest", page: 1, perPage: LIMITS.list.perPageDefault });
   });
 
-  it("rejects unknown keys (strict input)", () => {
-    const result = petsListInputSchema.safeParse({ bogus: true });
-    expect(result.success).toBe(false);
+  it("coerces the numeric params from their string form", () => {
+    const parsed = petsListQuerySchema.parse({ page: "3", perPage: "24" });
+    expect(parsed).toMatchObject({ page: 3, perPage: 24 });
+  });
+
+  it("accepts a repeated filter as both a bare value and an array", () => {
+    expect(petsListQuerySchema.parse({ species: "dog" }).species).toEqual(["dog"]);
+    expect(petsListQuerySchema.parse({ species: ["dog", "cat"] }).species).toEqual(["dog", "cat"]);
+  });
+
+  it("ignores unknown query params rather than rejecting the request", () => {
+    // A stray `?_=1699999` cache-buster must not turn a valid search into
+    // a 400 — unlike a request body, a query string is routinely decorated
+    // by clients and proxies.
+    const result = petsListQuerySchema.safeParse({ bogus: "true" });
+    expect(result.success).toBe(true);
   });
 });
 
-describe("pets.create input", () => {
+describe("POST /pets body", () => {
   it("rejects a description under the minimum length", () => {
-    const result = createPetInputSchema.safeParse({
+    const result = createPetRequestSchema.safeParse({
       name: "Rex",
       species: "dog",
       sex: "male",
@@ -68,11 +81,16 @@ describe("pets.create input", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("rejects unknown keys (strict body)", () => {
+    const result = createPetRequestSchema.safeParse({ bogus: true });
+    expect(result.success).toBe(false);
+  });
 });
 
-describe("auth sign-up input", () => {
+describe("POST /auth/register body", () => {
   it("requires city", () => {
-    const result = authSignUpInputSchema.safeParse({
+    const result = registerRequestSchema.safeParse({
       name: "Marta Ruiz",
       email: "marta@example.com",
       password: "correct-horse",

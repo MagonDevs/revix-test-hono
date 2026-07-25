@@ -28,7 +28,7 @@ export interface RequestLoggerContext {
 /**
  * Builds a request-scoped child logger carrying `requestId` (and `userId`
  * once known). Intended to be created once per request and stashed on the
- * Hono context / tRPC context.
+ * Hono context.
  */
 export function createRequestLogger(ctx: RequestLoggerContext): Logger {
   return rootLogger.child({

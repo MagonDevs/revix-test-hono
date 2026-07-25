@@ -1,10 +1,10 @@
 import { AppErrors, type AppError } from "./app-error.js";
 
 // Architecture §2.1/§4/§6 — error-domain primitives. These are used by the
-// service layer (to force a transaction rollback) and consumed by the tRPC
-// transport layer (`trpc/unwrap.ts`'s `unwrap()`), but they are not
-// themselves transport concerns, so they live here rather than under
-// `src/trpc`.
+// service layer (to force a transaction rollback) and consumed by the HTTP
+// transport layer (`http/lib/respond.ts`'s `unwrap()`, `http/middleware/
+// error-handler.ts`), but they are not themselves transport concerns, so
+// they live here rather than under `src/http`.
 
 /**
  * Architecture §6 — you cannot return a `Result` from a Drizzle

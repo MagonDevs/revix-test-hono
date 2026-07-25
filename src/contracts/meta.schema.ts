@@ -1,11 +1,11 @@
 import { z } from "zod";
 import { speciesSchema } from "./enums.js";
 
-// §8.6 — meta.breeds
-export const metaBreedsInputSchema = z.strictObject({
+// GET /meta/breeds?species=<species>
+export const metaBreedsQuerySchema = z.object({
   species: speciesSchema,
 });
-export type MetaBreedsInput = z.infer<typeof metaBreedsInputSchema>;
+export type MetaBreedsInput = z.infer<typeof metaBreedsQuerySchema>;
 
 export const metaBreedsOutputSchema = z.object({
   items: z.array(z.string()),

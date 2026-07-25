@@ -9,13 +9,14 @@ import {
   sexSchema,
   speciesSchema,
 } from "./enums.js";
-import { paginatedSchema } from "./pagination.js";
+import { paginatedSchema, paginationQuerySchema } from "./pagination.js";
+import { idSchema, isoDateTimeSchema, repeatable } from "./primitives.js";
 import { userSummarySchema } from "./user.schema.js";
 
 // §6.4 — PetPhoto. Array order is meaningful; index 0 is the cover photo.
 export const petPhotoSchema = z.object({
-  id: z.uuid(),
-  url: z.string(), // e.g. '/api/uploads/<uploadId>/raw'
+  id: idSchema,
+  url: z.string(), // e.g. '/api/v1/uploads/<uploadId>/raw'
   alt: z.string().nullable(),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
@@ -24,7 +25,7 @@ export type PetPhoto = z.infer<typeof petPhotoSchema>;
 
 // §6.5 — Pet
 export const petSchema = z.object({
-  id: z.uuid(),
+  id: idSchema,
   name: z.string(),
   species: speciesSchema,
   breed: z.string().nullable(),
@@ -43,65 +44,72 @@ export const petSchema = z.object({
   isFavourited: z.boolean(),
   viewerRequestStatus: requestStatusSchema.nullable(),
   guardian: userSummarySchema,
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
 });
 export type Pet = z.infer<typeof petSchema>;
 
-// §6.6 — OwnedPet, only from pets.listMine.
+// §6.6 — OwnedPet, only ever returned from GET /me/pets.
 export const ownedPetSchema = petSchema.extend({
   pendingRequestCount: z.number().int().nonnegative(),
 });
 export type OwnedPet = z.infer<typeof ownedPetSchema>;
 
-// §8.3 — pets.list
-export const petsListInputSchema = z.strictObject({
+// ---------------------------------------------------------------------------
+// Path params
+// ---------------------------------------------------------------------------
+
+export const petIdParamsSchema = z.object({ petId: idSchema });
+export type PetIdParams = z.infer<typeof petIdParamsSchema>;
+
+// ---------------------------------------------------------------------------
+// Query strings
+// ---------------------------------------------------------------------------
+//
+// Every value arrives as a string, so scalars coerce; `species`/`size`
+// additionally accept the repeated-parameter form (`?species=dog&species=cat`),
+// which is what the client emits for a multi-select filter.
+
+// GET /pets
+export const petsListQuerySchema = z.object({
   q: z.string().trim().min(1).max(LIMITS.list.searchMax).optional(),
-  species: z.array(speciesSchema).min(1).max(5).optional(),
-  size: z.array(petSizeSchema).min(1).max(3).optional(),
+  species: repeatable(speciesSchema).pipe(z.array(speciesSchema).min(1).max(5)).optional(),
+  size: repeatable(petSizeSchema).pipe(z.array(petSizeSchema).min(1).max(3)).optional(),
   sex: sexSchema.optional(),
   ageGroup: ageGroupSchema.optional(),
   city: z.string().trim().min(1).max(LIMITS.pet.cityMax).optional(),
   sort: petSortSchema.default("newest"),
-  page: z.number().int().positive().default(1),
-  perPage: z.number().int().min(1).max(LIMITS.list.perPageMax).default(LIMITS.list.perPageDefault),
+  ...paginationQuerySchema.shape,
 });
-export type PetsListInput = z.infer<typeof petsListInputSchema>;
+export type PetsListInput = z.infer<typeof petsListQuerySchema>;
 export const petsListOutputSchema = paginatedSchema(petSchema);
 
-// §8.3 — pets.byId
-export const petsByIdInputSchema = z.strictObject({
-  petId: z.uuid(),
-});
-export type PetsByIdInput = z.infer<typeof petsByIdInputSchema>;
-
-// §8.3 — pets.listByOwner
-export const petsListByOwnerInputSchema = z.strictObject({
-  ownerId: z.string(),
-  page: z.number().int().positive().default(1),
-  perPage: z.number().int().min(1).max(LIMITS.list.perPageMax).default(LIMITS.list.perPageDefault),
-});
-export type PetsListByOwnerInput = z.infer<typeof petsListByOwnerInputSchema>;
+// GET /users/:userId/pets — pagination only; the owner comes from the path.
+export const petsListByOwnerQuerySchema = paginationQuerySchema;
+export type PetsListByOwnerInput = { ownerId: string } & z.infer<typeof petsListByOwnerQuerySchema>;
 export const petsListByOwnerOutputSchema = paginatedSchema(petSchema);
 
-// §8.3 — pets.listMine
-export const petsListMineInputSchema = z.strictObject({
+// GET /me/pets
+export const petsListMineQuerySchema = z.object({
   status: petStatusSchema.optional(),
   sort: petSortSchema.default("newest"),
-  page: z.number().int().positive().default(1),
-  perPage: z.number().int().min(1).max(LIMITS.list.perPageMax).default(LIMITS.list.perPageDefault),
+  ...paginationQuerySchema.shape,
 });
-export type PetsListMineInput = z.infer<typeof petsListMineInputSchema>;
+export type PetsListMineInput = z.infer<typeof petsListMineQuerySchema>;
 export const petsListMineOutputSchema = paginatedSchema(ownedPetSchema);
 
-// §8.3 — pets.create
+// ---------------------------------------------------------------------------
+// Request bodies
+// ---------------------------------------------------------------------------
+
 export const petPhotoInputSchema = z.strictObject({
-  uploadId: z.uuid(),
+  uploadId: idSchema,
   alt: z.string().max(LIMITS.pet.altMax).nullable().optional(),
 });
 export type PetPhotoInput = z.infer<typeof petPhotoInputSchema>;
 
-export const createPetInputSchema = z.strictObject({
+// POST /pets
+export const createPetRequestSchema = z.strictObject({
   name: z.string().trim().min(LIMITS.pet.nameMin).max(LIMITS.pet.nameMax),
   species: speciesSchema,
   breed: z.string().trim().max(LIMITS.pet.breedMax).nullable().optional(),
@@ -123,34 +131,26 @@ export const createPetInputSchema = z.strictObject({
   isGoodWithKids: z.boolean().default(false),
   isGoodWithPets: z.boolean().default(false),
 });
-export type CreatePetInput = z.infer<typeof createPetInputSchema>;
+export type CreatePetInput = z.infer<typeof createPetRequestSchema>;
 
-export const petsCreateInputSchema = createPetInputSchema;
-export type PetsCreateInput = z.infer<typeof petsCreateInputSchema>;
-
-// §8.3 — pets.update: any subset of the create fields, plus the petId,
-// with at least one field present.
-export const petsUpdateInputSchema = z
-  .object({ petId: z.uuid() })
-  .extend(createPetInputSchema.partial().shape)
-  .strict()
-  .refine((v) => Object.keys(v).length > 1, {
+// PATCH /pets/:petId — any subset of the create fields, at least one of
+// them. The pet id lives in the path and is never accepted in the body.
+export const updatePetRequestSchema = createPetRequestSchema
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, {
     message: "At least one field is required",
   });
-export type PetsUpdateInput = z.infer<typeof petsUpdateInputSchema>;
+export type UpdatePetRequest = z.infer<typeof updatePetRequestSchema>;
 
-// §8.3 — pets.setStatus
-export const petsSetStatusInputSchema = z.strictObject({
-  petId: z.uuid(),
+/** What `pets.service.update` consumes: the path id merged into the body. */
+export type PetsUpdateInput = { petId: string } & UpdatePetRequest;
+
+// PATCH /pets/:petId/status
+export const updatePetStatusRequestSchema = z.strictObject({
   status: petStatusSchema,
   declinePendingRequests: z.boolean().default(true),
 });
-export type PetsSetStatusInput = z.infer<typeof petsSetStatusInputSchema>;
+export type UpdatePetStatusRequest = z.infer<typeof updatePetStatusRequestSchema>;
 
-// §8.3 — pets.remove
-export const petsRemoveInputSchema = z.strictObject({
-  petId: z.uuid(),
-});
-export type PetsRemoveInput = z.infer<typeof petsRemoveInputSchema>;
-export const petsRemoveOutputSchema = z.object({ id: z.uuid() });
-export type PetsRemoveOutput = z.infer<typeof petsRemoveOutputSchema>;
+/** What `pets.service.setStatus` consumes: the path id merged into the body. */
+export type PetsSetStatusInput = { petId: string } & UpdatePetStatusRequest;

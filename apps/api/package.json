@@ -16,7 +16,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/seed/index.ts",
-    "db:reset": "tsx src/seed/index.ts --reset"
+    "db:reset": "tsx src/seed/index.ts --reset",
+    "sweep:uploads": "tsx src/scripts/sweep-uploads.ts"
   },
   "dependencies": {
     "@adopta/contracts": "workspace:*",
@@ -26,6 +27,7 @@
     "@trpc/server": "11.18.0",
     "better-auth": "^1.6.25",
     "drizzle-orm": "^0.45.2",
+    "file-type": "^22.0.1",
     "hono": "^4.6.14",
     "neverthrow": "^8.2.0",
     "pg": "^8.13.1",

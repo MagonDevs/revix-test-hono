@@ -1,9 +1,13 @@
 import {
   petsByIdInputSchema,
+  petsCreateInputSchema,
   petsListByOwnerInputSchema,
   petsListInputSchema,
   petsListMineInputSchema,
   petsListOutputSchema,
+  petsRemoveInputSchema,
+  petsSetStatusInputSchema,
+  petsUpdateInputSchema,
   petSchema,
 } from "@adopta/contracts";
 import { describe, expect, it } from "vitest";
@@ -137,5 +141,71 @@ describe("output schema shapes", () => {
     // parsed value must not surface the leaked field either way.
     const parsed = petSchema.parse(withEmail);
     expect(parsed.guardian).not.toHaveProperty("email");
+  });
+});
+
+describe("petsCreateInputSchema (R-4)", () => {
+  const validPhoto = { uploadId: "0198f7b0-8e0e-7000-8000-000000000000" };
+  const base = {
+    name: "Rex",
+    species: "dog",
+    sex: "male",
+    ageMonths: 12,
+    size: "medium",
+    description: "A very good boy who loves long walks and belly rubs every single day.",
+    city: "Madrid",
+    photos: [validPhoto],
+  };
+
+  it("accepts a well-formed create input", () => {
+    expect(() => petsCreateInputSchema.parse(base)).not.toThrow();
+  });
+
+  it("has no status field to accept (R-4 — status is always 'available')", () => {
+    expect("status" in petsCreateInputSchema.shape).toBe(false);
+  });
+
+  it("rejects a status key on the wire (strict schema)", () => {
+    expect(() => petsCreateInputSchema.parse({ ...base, status: "adopted" })).toThrow();
+  });
+
+  it("requires at least one photo", () => {
+    expect(() => petsCreateInputSchema.parse({ ...base, photos: [] })).toThrow();
+  });
+});
+
+describe("petsUpdateInputSchema (R-16)", () => {
+  const petId = "0198f7b0-8e0e-7000-8000-000000000000";
+
+  it("accepts a partial patch", () => {
+    expect(() => petsUpdateInputSchema.parse({ petId, name: "New name" })).not.toThrow();
+  });
+
+  it("has no status field (setStatus is the only way to change status)", () => {
+    expect(() => petsUpdateInputSchema.parse({ petId, status: "adopted" })).toThrow();
+  });
+
+  it("accepts a full photos array, which replaces the whole ordered set", () => {
+    const parsed = petsUpdateInputSchema.parse({
+      petId,
+      photos: [{ uploadId: petId }, { uploadId: "0198f7b0-8e0e-7000-8000-000000000001" }],
+    });
+    expect(parsed.photos).toHaveLength(2);
+  });
+});
+
+describe("petsSetStatusInputSchema (R-5)", () => {
+  it("defaults declinePendingRequests to true (R-6)", () => {
+    const parsed = petsSetStatusInputSchema.parse({
+      petId: "0198f7b0-8e0e-7000-8000-000000000000",
+      status: "adopted",
+    });
+    expect(parsed.declinePendingRequests).toBe(true);
+  });
+});
+
+describe("petsRemoveInputSchema", () => {
+  it("requires a uuid petId", () => {
+    expect(() => petsRemoveInputSchema.parse({ petId: "not-a-uuid" })).toThrow();
   });
 });

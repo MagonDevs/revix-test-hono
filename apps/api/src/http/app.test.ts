@@ -27,9 +27,17 @@ describe("/trpc/* responses", () => {
   });
 });
 
-describe("placeholder mounts", () => {
-  it("/api/uploads/* returns 501 (upload pipeline is B6)", async () => {
-    const res = await app.request("/api/uploads/abc/raw");
-    expect(res.status).toBe(501);
+describe("/api/uploads (B6)", () => {
+  it("GET /api/uploads/:uploadId/raw returns 404 for a malformed id, never a 500", async () => {
+    const res = await app.request("/api/uploads/not-a-uuid/raw");
+    expect(res.status).toBe(404);
+  });
+
+  it("POST /api/uploads without a session returns the standard unauthenticated shape", async () => {
+    const res = await app.request("/api/uploads", { method: "POST", body: new FormData() });
+    expect(res.status).toBe(401);
+    const body = (await res.json()) as { error: { data: { appCode: string; requestId: string } } };
+    expect(body.error.data.appCode).toBe("unauthenticated");
+    expect(body.error.data.requestId).toBeTruthy();
   });
 });

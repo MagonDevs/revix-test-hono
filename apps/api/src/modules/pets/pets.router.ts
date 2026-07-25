@@ -1,11 +1,16 @@
 import {
   petsByIdInputSchema,
+  petsCreateInputSchema,
   petsListByOwnerInputSchema,
   petsListByOwnerOutputSchema,
   petsListInputSchema,
   petsListMineInputSchema,
   petsListMineOutputSchema,
   petsListOutputSchema,
+  petsRemoveInputSchema,
+  petsRemoveOutputSchema,
+  petsSetStatusInputSchema,
+  petsUpdateInputSchema,
   petSchema,
 } from "@adopta/contracts";
 import { protectedProcedure, publicProcedure, router } from "../../trpc/init.js";
@@ -41,4 +46,28 @@ export const petsRouter = router({
     .input(petsListMineInputSchema)
     .output(petsListMineOutputSchema)
     .query(async ({ ctx, input }) => unwrap(await service.listMine(ctx.db, ctx.user.id, input))),
+
+  create: protectedProcedure
+    .input(petsCreateInputSchema)
+    .output(petSchema)
+    .mutation(async ({ ctx, input }) => unwrap(await service.create(ctx.db, ctx.user.id, input))),
+
+  update: protectedProcedure
+    .input(petsUpdateInputSchema)
+    .output(petSchema)
+    .mutation(async ({ ctx, input }) => unwrap(await service.update(ctx.db, ctx.user.id, input))),
+
+  setStatus: protectedProcedure
+    .input(petsSetStatusInputSchema)
+    .output(petSchema)
+    .mutation(async ({ ctx, input }) =>
+      unwrap(await service.setStatus(ctx.db, ctx.user.id, input)),
+    ),
+
+  remove: protectedProcedure
+    .input(petsRemoveInputSchema)
+    .output(petsRemoveOutputSchema)
+    .mutation(async ({ ctx, input }) =>
+      unwrap(await service.remove(ctx.db, ctx.user.id, input.petId)),
+    ),
 });

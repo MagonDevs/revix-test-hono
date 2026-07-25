@@ -323,3 +323,133 @@ export async function findPhotosByPetIds(
   }
   return byPet;
 }
+
+// --- Write side (B6): pets.create/update/setStatus/remove -----------------
+// R-2 applies here too: writes are scoped by `ownerId` in the WHERE, not
+// a post-fetch check, so "not the owner" and "doesn't exist" both come
+// back as `undefined` -> the service maps that to `not_found`.
+
+export interface InsertPetInput {
+  id: string;
+  ownerId: string;
+  name: string;
+  species: Species;
+  breed: string | null;
+  sex: Sex;
+  ageMonths: number;
+  size: PetSize;
+  weightGrams: number | null;
+  description: string;
+  city: string;
+  isVaccinated: boolean;
+  isNeutered: boolean;
+  isGoodWithKids: boolean;
+  isGoodWithPets: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** R-4 — status is never accepted here; the column default is `available`. */
+export async function insert(db: Executor, input: InsertPetInput): Promise<void> {
+  await db.insert(pets).values(input);
+}
+
+export interface InsertPhotoInput {
+  id: string;
+  petId: string;
+  uploadId: string;
+  position: number;
+  alt: string | null;
+}
+
+export async function insertPhotos(db: Executor, rows: InsertPhotoInput[]): Promise<void> {
+  if (rows.length === 0) return;
+  await db.insert(petPhotos).values(rows);
+}
+
+/** R-16 — replacing the whole ordered set is delete-then-reinsert, one transaction. */
+export async function deletePhotosByPetId(db: Executor, petId: string): Promise<void> {
+  await db.delete(petPhotos).where(eq(petPhotos.petId, petId));
+}
+
+export interface UpdatePetPatch {
+  name?: string;
+  species?: Species;
+  breed?: string | null;
+  sex?: Sex;
+  ageMonths?: number;
+  size?: PetSize;
+  weightGrams?: number | null;
+  description?: string;
+  city?: string;
+  isVaccinated?: boolean;
+  isNeutered?: boolean;
+  isGoodWithKids?: boolean;
+  isGoodWithPets?: boolean;
+}
+
+/** Scoped by `ownerId` — R-2: not the owner returns `undefined`, same as "doesn't exist". */
+export async function update(
+  db: Executor,
+  petId: string,
+  ownerId: string,
+  patch: UpdatePetPatch,
+  updatedAt: Date,
+): Promise<{ id: string } | undefined> {
+  if (Object.keys(patch).length === 0) {
+    const [row] = await db
+      .select({ id: pets.id })
+      .from(pets)
+      .where(and(eq(pets.id, petId), eq(pets.ownerId, ownerId)))
+      .limit(1);
+    return row;
+  }
+  const [row] = await db
+    .update(pets)
+    .set({ ...patch, updatedAt })
+    .where(and(eq(pets.id, petId), eq(pets.ownerId, ownerId)))
+    .returning({ id: pets.id });
+  return row;
+}
+
+/** The pet's current status, scoped by owner (used to validate a legal transition before writing). */
+export async function findOwnedStatus(
+  db: Executor,
+  petId: string,
+  ownerId: string,
+): Promise<PetStatus | undefined> {
+  const [row] = await db
+    .select({ status: pets.status })
+    .from(pets)
+    .where(and(eq(pets.id, petId), eq(pets.ownerId, ownerId)))
+    .limit(1);
+  return row?.status;
+}
+
+export async function setStatus(
+  db: Executor,
+  petId: string,
+  ownerId: string,
+  status: PetStatus,
+  updatedAt: Date,
+): Promise<{ id: string } | undefined> {
+  const [row] = await db
+    .update(pets)
+    .set({ status, updatedAt })
+    .where(and(eq(pets.id, petId), eq(pets.ownerId, ownerId)))
+    .returning({ id: pets.id });
+  return row;
+}
+
+/** R-17 — cascade to photos/requests/favourites is FK-level (data model §4); this is a plain delete. */
+export async function deleteById(
+  db: Executor,
+  petId: string,
+  ownerId: string,
+): Promise<{ id: string } | undefined> {
+  const [row] = await db
+    .delete(pets)
+    .where(and(eq(pets.id, petId), eq(pets.ownerId, ownerId)))
+    .returning({ id: pets.id });
+  return row;
+}

@@ -12,6 +12,7 @@ import { rateLimit } from "./middleware/rate-limit.middleware.js";
 import { requestId } from "./middleware/request-id.middleware.js";
 import { createAuthRoutes } from "./routes/auth.route.js";
 import { createHealthRoutes } from "./routes/health.route.js";
+import { createUploadsRoutes } from "./routes/uploads.route.js";
 import type { Logger } from "../lib/logger.js";
 
 // Architecture §3 — Hono composition. Middleware order is load-bearing:
@@ -39,8 +40,8 @@ export function createApp() {
   app.use("/api/auth/*", rateLimit({ window: "15m", max: 50, by: "ip" }));
   app.route("/", createAuthRoutes());
 
-  // Uploads mount point (B6).
-  app.all("/api/uploads/*", (c) => c.json({ error: { message: "Not implemented" } }, 501));
+  // Uploads (B6): contract §7.4-7.5, plain HTTP not tRPC.
+  app.route("/", createUploadsRoutes());
 
   // `Cache-Control: private, no-store` on every /trpc response (contract
   // §2). Set before the trpcServer middleware runs so it applies

@@ -1,0 +1,46 @@
+// §4 — Constraints. Every limit in the system, in one place. All
+// validation elsewhere references these constants; no schema contains an
+// inline number.
+
+export const LIMITS = {
+  user: {
+    nameMin: 2,
+    nameMax: 60,
+    emailMax: 254,
+    passwordMin: 8,
+    passwordMax: 72,
+    cityMin: 2,
+    cityMax: 80,
+    phoneMax: 30,
+    bioMax: 500,
+  },
+  pet: {
+    nameMin: 2,
+    nameMax: 40,
+    breedMax: 60,
+    ageMonthsMin: 0,
+    ageMonthsMax: 360,
+    weightKgMin: 0.1,
+    weightKgMax: 120,
+    descriptionMin: 30,
+    descriptionMax: 2000,
+    cityMin: 2,
+    cityMax: 80,
+    photosMin: 1,
+    photosMax: 6,
+    altMax: 200,
+  },
+  adoptionRequest: {
+    messageMin: 20,
+    messageMax: 1000,
+  },
+  upload: {
+    maxBytes: 5 * 1024 * 1024,
+    mimeTypes: ["image/jpeg", "image/png", "image/webp"],
+  },
+  list: {
+    perPageDefault: 12,
+    perPageMax: 48,
+    searchMax: 80,
+  },
+} as const;

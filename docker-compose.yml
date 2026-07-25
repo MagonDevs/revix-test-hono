@@ -1,0 +1,34 @@
+name: adopta
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: adopta
+      POSTGRES_PASSWORD: adopta
+      POSTGRES_DB: adopta
+    ports:
+      - "5432:5432"
+    volumes:
+      - adopta_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adopta"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # api:
+  #   build:
+  #     context: .
+  #     dockerfile: apps/api/Dockerfile
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   env_file: ./apps/api/.env
+  #   ports:
+  #     - "8787:8787"
+  #   # Uncommented in B2, once apps/api exists and has a Dockerfile.
+
+volumes:
+  adopta_postgres_data:

@@ -1,0 +1,43 @@
+{
+  "name": "adopta-api-workspace",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.26.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
+    "validate": "turbo run typecheck lint test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:migrate": "echo 'db:migrate is a no-op until apps/api exists (B1)' && exit 0",
+    "db:seed": "echo 'db:seed is a no-op until apps/api exists (B4)' && exit 0",
+    "db:reset": "echo 'db:reset is a no-op until apps/api exists (B4)' && exit 0",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@adopta/eslint-config": "workspace:*",
+    "@commitlint/cli": "^19.6.1",
+    "@commitlint/config-conventional": "^19.6.0",
+    "eslint": "^9.18.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.3.0",
+    "prettier": "^3.4.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.3"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix"
+    ],
+    "*.{ts,tsx,js,jsx,json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
+}

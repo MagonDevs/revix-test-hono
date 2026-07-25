@@ -3,7 +3,7 @@
 Status: **unverified, needs a live `npx @better-auth/cli generate` run.**
 
 This sandbox has no interactive terminal / live Postgres wired up for the
-Better Auth CLI, so `apps/api/src/db/schema/auth.ts` was hand-authored to
+Better Auth CLI, so `src/db/schema/auth.ts` was hand-authored to
 match Better Auth 1.5+'s documented standard Drizzle schema shape
 (singular table names: `user`, `session`, `account`, `verification`)
 plus the three `additionalFields` declared in `auth.config.ts` (`city`
@@ -13,7 +13,7 @@ required, `phone` and `bio` optional).
 
 1. Provision a real Postgres (e.g. `docker compose up postgres`).
 2. Set `DATABASE_URL` and run `npx @better-auth/cli generate` from
-   `apps/api`, pointed at `auth.config.ts`.
+   the repo root, pointed at `auth.config.ts`.
 3. Diff the CLI's output against `src/db/schema/auth.ts` column-by-column
    (types, nullability, defaults, index/unique constraints — especially
    on `session.token` and `user.email`).

@@ -10,7 +10,7 @@ Verified 2026-07-25 from this sandbox (network reachable).
 | `picsum.photos`              | `https://picsum.photos/seed/adopta-{lock}/{w}/{h}`          | `HEAD` → 405 (Method Not Allowed). `GET` → `302` redirect → 200, `image/jpeg` after following. Same as loremflickr: must follow redirects and must not rely on `HEAD`.          |
 | `api.dicebear.com` (avatars) | `https://api.dicebear.com/9.x/notionists/svg?seed=<userId>` | Works. `GET`/`HEAD` → 200, `image/svg+xml`.                                                                                                                                     |
 
-Conclusions baked into `apps/api/src/seed/images/ingest.ts`:
+Conclusions baked into `src/seed/images/ingest.ts`:
 
 - Always issue a plain `GET` (never `HEAD`) — cataas 404s on HEAD and picsum 405s.
 - Let `fetch` follow redirects (its default) — loremflickr and picsum both 302 to the real asset.

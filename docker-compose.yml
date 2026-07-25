@@ -21,7 +21,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
       postgres:
@@ -37,14 +37,14 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:-dev-secret-change-me-please-32chars}
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:8787}
       STORAGE_DRIVER: local
-      STORAGE_LOCAL_DIR: /workspace/apps/api/.storage
+      STORAGE_LOCAL_DIR: /app/.storage
       LOG_LEVEL: info
       SEED_SCENARIO: ${SEED_SCENARIO:-demo}
       SEED_IMAGE_MODE: ${SEED_IMAGE_MODE:-offline}
     ports:
       - "8787:8787"
     volumes:
-      - adopta_api_storage:/workspace/apps/api/.storage
+      - adopta_api_storage:/app/.storage
 
 volumes:
   adopta_postgres_data:

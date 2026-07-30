@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import {
   createPetRequestSchema,
   petIdParamsSchema,
+  petReportOutputSchema,
   petSchema,
   petsListByOwnerOutputSchema,
   petsListByOwnerQuerySchema,
@@ -68,6 +69,18 @@ export function createPetsRoutes() {
     const { petId } = parseParams(c, petIdParamsSchema);
     unwrap(await petsService.remove(db, caller.id, petId));
     return noContent(c);
+  });
+
+  app.post("/pets/:petId/report", async (c) => {
+    const { db, user } = c.var.ctx;
+    const caller = requireUser(c);
+    const { petId } = parseParams(c, petIdParamsSchema);
+    unwrap(await petsService.byId(db, petId, user?.id ?? null));
+
+    const body = await c.req.json<{ reason?: string }>();
+    console.warn("pet reported", { petId, reporterId: caller.id, reason: body.reason });
+
+    return json(c, petReportOutputSchema, { petId, received: true }, 202);
   });
 
   app.get("/me/pets", async (c) => {

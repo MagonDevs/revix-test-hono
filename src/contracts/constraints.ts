@@ -25,6 +25,8 @@ export const LIMITS = {
     photosMin: 1,
     photosMax: 6,
     altMax: 200,
+    reportReasonMin: 10,
+    reportReasonMax: 500,
   },
   adoptionRequest: {
     messageMin: 20,

@@ -125,4 +125,15 @@ export const updatePetStatusRequestSchema = z.strictObject({
 });
 export type UpdatePetStatusRequest = z.infer<typeof updatePetStatusRequestSchema>;
 
+export const petReportRequestSchema = z.strictObject({
+  reason: z.string().trim().min(LIMITS.pet.reportReasonMin).max(LIMITS.pet.reportReasonMax),
+});
+export type PetReportRequest = z.infer<typeof petReportRequestSchema>;
+
+export const petReportOutputSchema = z.object({
+  petId: idSchema,
+  received: z.boolean(),
+});
+export type PetReportOutput = z.infer<typeof petReportOutputSchema>;
+
 export type PetsSetStatusInput = { petId: string } & UpdatePetStatusRequest;

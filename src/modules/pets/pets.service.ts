@@ -16,6 +16,7 @@ import type {
   PetsListInput,
   PetsListMineInput,
   PetsSetStatusInput,
+  PetStatus,
   PetsUpdateInput,
   PaginationMeta,
 } from "#contracts";
@@ -273,6 +274,21 @@ export function update(
 
       const photosByPet = await repo.findPhotosByPetIds(db, [petId]);
       return mapPet(row, photosFor(photosByPet, petId), row);
+    })(),
+    toAppError,
+  );
+}
+
+export function currentStatus(
+  db: Executor,
+  callerId: string,
+  petId: string,
+): ResultAsync<PetStatus, AppError> {
+  return ResultAsync.fromPromise(
+    (async () => {
+      const status = await repo.findOwnedStatus(db, petId, callerId);
+      if (!status) throw new Error("Pet not found");
+      return status;
     })(),
     toAppError,
   );

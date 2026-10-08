@@ -9,11 +9,13 @@ import {
   petsListMineQuerySchema,
   petsListOutputSchema,
   petsListQuerySchema,
+  petStatusOptionsSchema,
+  petStatusSchema,
   updatePetRequestSchema,
   updatePetStatusRequestSchema,
   usersByIdParamsSchema,
 } from "#contracts";
-import { petsService } from "../../modules/pets/index.js";
+import { isLegalTransition, petsService } from "../../modules/pets/index.js";
 import { requireUser } from "../lib/guards.js";
 import { parseBody, parseParams, parseQuery } from "../lib/parse.js";
 import { json, noContent, unwrap } from "../lib/respond.js";
@@ -51,6 +53,15 @@ export function createPetsRoutes() {
     const body = await parseBody(c, updatePetRequestSchema);
     const result = await petsService.update(db, caller.id, { petId, ...body });
     return json(c, petSchema, unwrap(result));
+  });
+
+  app.get("/pets/:petId/status-options", async (c) => {
+    const { db } = c.var.ctx;
+    const caller = requireUser(c);
+    const { petId } = parseParams(c, petIdParamsSchema);
+    const status = unwrap(await petsService.currentStatus(db, caller.id, petId));
+    const nextStatuses = petStatusSchema.options.filter((to) => isLegalTransition(status, to));
+    return json(c, petStatusOptionsSchema, { status, nextStatuses });
   });
 
   app.patch("/pets/:petId/status", async (c) => {

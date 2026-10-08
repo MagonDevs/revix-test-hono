@@ -126,3 +126,9 @@ export const updatePetStatusRequestSchema = z.strictObject({
 export type UpdatePetStatusRequest = z.infer<typeof updatePetStatusRequestSchema>;
 
 export type PetsSetStatusInput = { petId: string } & UpdatePetStatusRequest;
+
+export const petStatusOptionsSchema = z.object({
+  status: petStatusSchema,
+  nextStatuses: z.array(petStatusSchema),
+});
+export type PetStatusOptions = z.infer<typeof petStatusOptionsSchema>;

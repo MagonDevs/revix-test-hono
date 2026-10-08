@@ -226,6 +226,38 @@ export async function listByOwnerPaginated(
   return { items: rows.map((r) => toPetRow(r)), total };
 }
 
+export async function listSimilarPaginated(
+  db: Executor,
+  source: Pick<PetRow, "species" | "city">,
+  page: number,
+  perPage: number,
+  viewerId: string | null,
+): Promise<PageResult<PetRowWithFlags>> {
+  const flags = viewerFlagFields(viewerId);
+  const where = and(
+    inArray(pets.status, PUBLIC_LIST_STATUSES),
+    eq(pets.species, source.species),
+    sql`lower(${pets.city}) = ${source.city.toLowerCase()}`,
+  ) as SQL;
+
+  const rows = await db
+    .select({
+      ...petFields,
+      guardian: guardianFields,
+      ...flags,
+      total: sql<number>`count(*) over()`.mapWith(Number),
+    })
+    .from(pets)
+    .innerJoin(user, eq(pets.ownerId, user.id))
+    .where(where)
+    .orderBy(desc(pets.createdAt), desc(pets.id))
+    .limit(perPage)
+    .offset(page * perPage);
+
+  const total = rows.length > 0 ? (rows[0]?.total ?? 0) : await countPets(db, where);
+  return { items: rows.map((r) => toPetRow(r)), total };
+}
+
 export interface PetsListMineFilters {
   status?: PetStatus | undefined;
   sort: PetSort;

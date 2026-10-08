@@ -1,4 +1,4 @@
-import { and, asc, between, desc, eq, inArray, or, type SQL, sql } from "drizzle-orm";
+import { and, asc, between, desc, eq, gte, inArray, or, type SQL, sql } from "drizzle-orm";
 import { user } from "../../db/schema/auth.js";
 import { petPhotos } from "../../db/schema/pet-photos.js";
 import { pets } from "../../db/schema/pets.js";
@@ -207,6 +207,34 @@ export async function listByOwnerPaginated(
 ): Promise<PageResult<PetRowWithFlags>> {
   const flags = viewerFlagFields(viewerId);
   const where = and(eq(pets.ownerId, ownerId), eq(pets.status, "available" as PetStatus)) as SQL;
+
+  const rows = await db
+    .select({
+      ...petFields,
+      guardian: guardianFields,
+      ...flags,
+      total: sql<number>`count(*) over()`.mapWith(Number),
+    })
+    .from(pets)
+    .innerJoin(user, eq(pets.ownerId, user.id))
+    .where(where)
+    .orderBy(desc(pets.createdAt), desc(pets.id))
+    .limit(perPage)
+    .offset((page - 1) * perPage);
+
+  const total = rows.length > 0 ? (rows[0]?.total ?? 0) : await countPets(db, where);
+  return { items: rows.map((r) => toPetRow(r)), total };
+}
+
+export async function listRecentPaginated(
+  db: Executor,
+  since: Date,
+  page: number,
+  perPage: number,
+  viewerId: string | null,
+): Promise<PageResult<PetRowWithFlags>> {
+  const flags = viewerFlagFields(viewerId);
+  const where = and(inArray(pets.status, PUBLIC_LIST_STATUSES), gte(pets.createdAt, since)) as SQL;
 
   const rows = await db
     .select({

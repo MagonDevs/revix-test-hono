@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import {
   createPetRequestSchema,
+  LIMITS,
   petIdParamsSchema,
   petSchema,
   petsListByOwnerOutputSchema,
@@ -35,6 +36,17 @@ export function createPetsRoutes() {
     const body = await parseBody(c, createPetRequestSchema);
     const result = await petsService.create(db, caller.id, body);
     return json(c, petSchema, unwrap(result), 201);
+  });
+
+  app.get("/pets/recent", async (c) => {
+    const { db, user } = c.var.ctx;
+    const page = Math.max(Number.parseInt(c.req.query("page") ?? "", 10) || 1, 1);
+    const perPage = Math.min(
+      Math.max(Number.parseInt(c.req.query("perPage") ?? "", 10) || LIMITS.list.perPageDefault, 1),
+      LIMITS.list.perPageMax,
+    );
+    const result = await petsService.listRecent(db, { page, perPage }, user?.id ?? null);
+    return json(c, petsListOutputSchema, unwrap(result));
   });
 
   app.get("/pets/:petId", async (c) => {

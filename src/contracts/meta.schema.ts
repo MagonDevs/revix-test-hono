@@ -10,3 +10,14 @@ export const metaBreedsOutputSchema = z.object({
   items: z.array(z.string()),
 });
 export type MetaBreedsOutput = z.infer<typeof metaBreedsOutputSchema>;
+
+export const metaSpeciesItemSchema = z.object({
+  value: speciesSchema,
+  label: z.string(),
+});
+export type MetaSpeciesItem = z.infer<typeof metaSpeciesItemSchema>;
+
+export const metaSpeciesOutputSchema = z.object({
+  items: z.array(metaSpeciesItemSchema),
+});
+export type MetaSpeciesOutput = z.infer<typeof metaSpeciesOutputSchema>;

@@ -1,1 +1,1 @@
-export { BREEDS_BY_SPECIES } from "./meta.data.js";
+export { BREEDS_BY_SPECIES, SPECIES_CATALOGUE } from "./meta.data.js";

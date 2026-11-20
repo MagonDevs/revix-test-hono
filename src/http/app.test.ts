@@ -24,6 +24,22 @@ describe(`${API_PREFIX}/* responses`, () => {
   });
 });
 
+describe(`GET ${API_PREFIX}/meta/species`, () => {
+  it("lists every species in the enum's order with its label, without a session", async () => {
+    const res = await app.request(`${API_PREFIX}/meta/species`);
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { items: { value: string; label: string }[] };
+    expect(body.items).toEqual([
+      { value: "dog", label: "Dog" },
+      { value: "cat", label: "Cat" },
+      { value: "rabbit", label: "Rabbit" },
+      { value: "bird", label: "Bird" },
+      { value: "other", label: "Other" },
+    ]);
+  });
+});
+
 describe("error envelope", () => {
   it("reports a missing query param as a validation_error with the offending field", async () => {
     const res = await app.request(`${API_PREFIX}/meta/breeds`);

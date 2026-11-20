@@ -1,4 +1,4 @@
-import type { Species } from "#contracts";
+import { speciesSchema, type Species } from "#contracts";
 
 export const BREEDS_BY_SPECIES: Record<Species, string[]> = {
   dog: [
@@ -49,3 +49,16 @@ export const BREEDS_BY_SPECIES: Record<Species, string[]> = {
   ],
   other: ["Guinea Pig", "Hamster", "Ferret", "Tortoise", "Mixed Breed"],
 };
+
+const SPECIES_LABELS: Record<Species, string> = {
+  dog: "Dog",
+  cat: "Cat",
+  rabbit: "Rabbit",
+  bird: "Bird",
+  other: "Other",
+};
+
+export const SPECIES_CATALOGUE = speciesSchema.options.map((value) => ({
+  value,
+  label: SPECIES_LABELS[value],
+}));

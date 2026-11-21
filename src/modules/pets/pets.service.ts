@@ -25,6 +25,9 @@ import type { IdPort } from "../../ports/id.port.js";
 
 const idPort: IdPort = { next: () => uuidv7() };
 
+const RECENT_WINDOW_DAYS = Number(process.env["RECENT_PETS_WINDOW_DAYS"] ?? 14);
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 class PetNotFound extends Error {}
 
 function paginationMeta(page: number, perPage: number, total: number): PaginationMeta {
@@ -82,6 +85,34 @@ export function listByOwner(
       const { items, total } = await repo.listByOwnerPaginated(
         db,
         input.ownerId,
+        input.page,
+        input.perPage,
+        viewerId,
+      );
+      const photosByPet = await repo.findPhotosByPetIds(
+        db,
+        items.map((row) => row.id),
+      );
+      return {
+        items: items.map((row) => mapPet(row, photosFor(photosByPet, row.id), row)),
+        meta: paginationMeta(input.page, input.perPage, total),
+      };
+    })(),
+    toAppError,
+  );
+}
+
+export function listRecent(
+  db: Executor,
+  input: { page: number; perPage: number },
+  viewerId: string | null,
+): ResultAsync<{ items: Pet[]; meta: PaginationMeta }, AppError> {
+  return ResultAsync.fromPromise(
+    (async () => {
+      const since = new Date(Date.now() - RECENT_WINDOW_DAYS * DAY_MS);
+      const { items, total } = await repo.listRecentPaginated(
+        db,
+        since,
         input.page,
         input.perPage,
         viewerId,

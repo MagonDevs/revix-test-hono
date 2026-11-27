@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import {
   createPetRequestSchema,
+  LIMITS,
   petIdParamsSchema,
   petSchema,
   petsListByOwnerOutputSchema,
@@ -17,7 +18,20 @@ import { petsService } from "../../modules/pets/index.js";
 import { requireUser } from "../lib/guards.js";
 import { parseBody, parseParams, parseQuery } from "../lib/parse.js";
 import { json, noContent, unwrap } from "../lib/respond.js";
+import type { Pet, PetSize } from "#contracts";
 import type { AppVariables } from "../context.js";
+
+const SIZE_RANK: Record<PetSize, number> = { small: 0, medium: 1, large: 2 };
+
+function similarityScore(source: Pet, candidate: Pet): number {
+  let score = 0;
+  const sizeGap = Math.abs(SIZE_RANK[candidate.size] - SIZE_RANK[source.size]);
+  if (sizeGap === 0) score += 2;
+  else if (sizeGap === 1) score += 1;
+  if (Math.abs(candidate.ageMonths - source.ageMonths) <= 12) score += 2;
+  if (candidate.breed !== null && candidate.breed === source.breed) score += 1;
+  return score;
+}
 
 export function createPetsRoutes() {
   const app = new Hono<{ Variables: AppVariables }>();
@@ -42,6 +56,24 @@ export function createPetsRoutes() {
     const { petId } = parseParams(c, petIdParamsSchema);
     const result = await petsService.byId(db, petId, user?.id ?? null);
     return json(c, petSchema, unwrap(result));
+  });
+
+  app.get("/pets/:petId/similar", async (c) => {
+    const { db, user } = c.var.ctx;
+    const { petId } = parseParams(c, petIdParamsSchema);
+    const page = Number.parseInt(c.req.query("page") ?? "", 10) || 1;
+    const perPage = Math.min(
+      Number.parseInt(c.req.query("perPage") ?? "", 10) || LIMITS.list.perPageDefault,
+      LIMITS.list.perPageMax,
+    );
+    const result = await petsService.listSimilar(db, { petId, page, perPage }, user?.id ?? null);
+    const { source, items, meta } = unwrap(result);
+    const ranked = items
+      .filter((pet) => pet.id !== source.id)
+      .map((pet) => ({ pet, score: similarityScore(source, pet) }))
+      .sort((a, b) => b.score - a.score)
+      .map(({ pet }) => pet);
+    return json(c, petsListOutputSchema, { items: ranked, meta });
   });
 
   app.patch("/pets/:petId", async (c) => {

@@ -99,6 +99,37 @@ export function listByOwner(
   );
 }
 
+export function listSimilar(
+  db: Executor,
+  input: { petId: string; page: number; perPage: number },
+  viewerId: string | null,
+): ResultAsync<{ source: Pet; items: Pet[]; meta: PaginationMeta }, AppError> {
+  return ResultAsync.fromPromise(
+    (async () => {
+      const source = await repo.findById(db, input.petId, viewerId);
+      if (!source) throw new Error("Pet not found");
+
+      const { items, total } = await repo.listSimilarPaginated(
+        db,
+        source,
+        input.page,
+        input.perPage,
+        viewerId,
+      );
+      const photosByPet = await repo.findPhotosByPetIds(db, [
+        source.id,
+        ...items.map((row) => row.id),
+      ]);
+      return {
+        source: mapPet(source, photosFor(photosByPet, source.id), source),
+        items: items.map((row) => mapPet(row, photosFor(photosByPet, row.id), row)),
+        meta: paginationMeta(input.page, input.perPage, total),
+      };
+    })(),
+    toAppError,
+  );
+}
+
 export function listMine(
   db: Executor,
   ownerId: string,
